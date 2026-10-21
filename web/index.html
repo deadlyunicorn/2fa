@@ -1,23 +1,8 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <!--
-    If you are serving your web app in a path other than the root, change the
-    href value below to reflect the base path you are serving from.
-
-    The path provided below has to start and end with a slash "/" in order for
-    it to work correctly.
-
-    For more details:
-    * https://developer.mozilla.org/en-US/docs/Web/HTML/Element/base
-
-    This is a placeholder for base href that will be replaced by the value of
-    the `--base-href` argument provided to `flutter build`.
-  -->
-  <base href="$FLUTTER_BASE_HREF">
-
   <meta charset="UTF-8">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; worker-src 'self' blob:;">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' blob: data:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' blob: data:; worker-src 'self' blob:;">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
   <meta name="description" content="Offline, encrypted two-factor authentication (TOTP/HOTP) app.">
 
@@ -31,17 +16,86 @@
   <link rel="icon" type="image/png" href="favicon.png"/>
 
   <title>Offline 2FA</title>
-  <link rel="manifest" href="manifest.json">
-</head>
-<body>
-  <!--
-    You can customize the "flutter_bootstrap.js" script.
-    This is useful to provide a custom configuration to the Flutter loader
-    or to give the user feedback during the initialization process.
 
-    For more details:
-    * https://docs.flutter.dev/platform-integration/web/initialization
-  -->
-  <script src="flutter_bootstrap.js" async></script>
+  <script>
+    // Only load manifest when served over http/https to prevent CORS errors on file://
+    if (window.location.protocol !== 'file:') {
+      var manifestLink = document.createElement('link');
+      manifestLink.rel = 'manifest';
+      manifestLink.href = 'manifest.json';
+      document.head.appendChild(manifestLink);
+    }
+  </script>
+
+  <!-- Offline VFS shim: enables direct file:/// opening in modern browsers -->
+  <script src="offline_vfs.js"></script>
+</head>
+<body style="margin:0; padding:0; background:#0f172a; overflow:hidden;">
+  <!-- Fallback / localhost instructions banner (shown if file:// requires local server or takes time) -->
+  <div id="offline-instructions-card" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); max-width:540px; width:calc(100% - 40px); background:#1e293b; color:#f8fafc; border:1px solid #334155; border-radius:16px; padding:28px 32px; box-shadow:0 25px 50px -12px rgba(0,0,0,0.6); font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; z-index:999999; box-sizing:border-box;">
+    <div style="display:flex; align-items:center; gap:12px; margin-bottom:16px;">
+      <div style="width:40px; height:40px; border-radius:10px; background:#2563eb; display:flex; align-items:center; justify-content:center; font-weight:bold; font-size:20px; color:#fff;">2FA</div>
+      <div>
+        <h2 style="margin:0; font-size:18px; font-weight:600; color:#f1f5f9;">Offline 2FA Web Runner</h2>
+        <div style="font-size:12px; color:#94a3b8;">Local offline launcher instructions</div>
+      </div>
+    </div>
+    <p style="margin:0 0 14px 0; font-size:14px; line-height:1.6; color:#cbd5e1;">
+      If your browser blocks WebAssembly execution over direct <code style="background:#0f172a; padding:2px 6px; border-radius:4px; color:#38bdf8;">file:///</code> URLs, run the included local runner:
+    </p>
+    <div style="background:#0f172a; border-radius:8px; padding:12px 16px; font-family:monospace; font-size:13px; color:#38bdf8; margin-bottom:16px; border:1px solid #1e293b;">
+      <div style="color:#64748b; font-size:11px; margin-bottom:4px;"># On Linux or macOS:</div>
+      <div>./run-offline-web.sh</div>
+      <div style="color:#64748b; font-size:11px; margin-top:8px; margin-bottom:4px;"># On Windows:</div>
+      <div>run-offline-web.bat</div>
+      <div style="color:#64748b; font-size:11px; margin-top:8px; margin-bottom:4px;"># Or using python directly:</div>
+      <div>python3 -m http.server 8080 --bind 127.0.0.1</div>
+    </div>
+    <div style="font-size:13px; color:#94a3b8; line-height:1.5;">
+      Then open <a href="http://127.0.0.1:8080" style="color:#60a5fa; text-decoration:underline;">http://127.0.0.1:8080</a> in your browser. Strictly 100% offline (bound to localhost).
+    </div>
+    <div style="margin-top:20px; text-align:right;">
+      <button onclick="document.getElementById('offline-instructions-card').style.display='none';" style="background:#334155; border:none; color:#f8fafc; padding:8px 16px; border-radius:8px; font-size:13px; cursor:pointer; font-weight:500;">Dismiss</button>
+    </div>
+  </div>
+
+  <script>
+    // Show instruction card if Flutter has not initialized after 8 seconds on file://
+    if (window.location.protocol === 'file:') {
+      var timeoutId = setTimeout(function() {
+        if (!document.querySelector('flutter-view') && !document.querySelector('flt-glass-pane')) {
+          var card = document.getElementById('offline-instructions-card');
+          if (card) card.style.display = 'block';
+        }
+      }, 8000);
+
+      // Hide instruction card as soon as Flutter renders
+      var observer = new MutationObserver(function(mutations, obs) {
+        if (document.querySelector('flutter-view') || document.querySelector('flt-glass-pane')) {
+          clearTimeout(timeoutId);
+          var card = document.getElementById('offline-instructions-card');
+          if (card) card.style.display = 'none';
+          obs.disconnect();
+        }
+      });
+      observer.observe(document.body, { childList: true, subtree: true });
+    }
+
+    function launchFlutterApp() {
+      var script = document.createElement('script');
+      script.src = 'flutter_bootstrap.js';
+      script.async = true;
+      document.body.appendChild(script);
+    }
+
+    if (window.location.protocol === 'file:' && window._offlineVfsReady) {
+      window._offlineVfsReady.then(launchFlutterApp).catch(function(err) {
+        console.warn('VFS ready catch, launching Flutter bootstrap anyway:', err);
+        launchFlutterApp();
+      });
+    } else {
+      launchFlutterApp();
+    }
+  </script>
 </body>
 </html>

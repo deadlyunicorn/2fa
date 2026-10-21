@@ -169,8 +169,11 @@ jobs:
       - name: Build Web
         run: flutter build web --release --no-web-resources-cdn
 
+      - name: Bundle Web Offline
+        run: dart run tool/bundle_web_offline.dart --skip-build
+
       - name: Create Web release archive
-        run: tar -czvf offline2fa-web.tar.gz -C build/web .
+        run: cp build/offline2fa-v0.1.0-web-offline.tar.gz offline2fa-web.tar.gz
 
       - name: Upload Web Archive
         uses: actions/upload-artifact@v4
