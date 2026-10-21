@@ -36,12 +36,17 @@ class VaultCodec {
     final jsonString = jsonEncode(payload.toJson());
     final plaintext = Uint8List.fromList(utf8.encode(jsonString));
 
-    final ciphertextWithTag = await AeadCipher.encrypt(
-      plaintext: plaintext,
-      key: key,
-      nonce: effectiveNonce,
-      aad: headerBytes,
-    );
+    final Uint8List ciphertextWithTag;
+    try {
+      ciphertextWithTag = await AeadCipher.encrypt(
+        plaintext: plaintext,
+        key: key,
+        nonce: effectiveNonce,
+        aad: headerBytes,
+      );
+    } finally {
+      zeroBytes(plaintext);
+    }
 
     final result = Uint8List(headerBytes.length + ciphertextWithTag.length);
     result.setRange(0, headerBytes.length, headerBytes);
@@ -94,27 +99,31 @@ class VaultCodec {
       aad: headerBytes,
     );
 
-    final String jsonString;
     try {
-      jsonString = utf8.decode(plaintext);
-    } catch (_) {
-      throw const InvalidPayload('Decrypted payload is not valid UTF-8');
-    }
+      final String jsonString;
+      try {
+        jsonString = utf8.decode(plaintext);
+      } catch (_) {
+        throw const InvalidPayload('Decrypted payload is not valid UTF-8');
+      }
 
-    final Object? decoded;
-    try {
-      decoded = jsonDecode(jsonString);
-    } catch (_) {
-      throw const InvalidPayload('Decrypted payload is not valid JSON');
-    }
+      final Object? decoded;
+      try {
+        decoded = jsonDecode(jsonString);
+      } catch (_) {
+        throw const InvalidPayload('Decrypted payload is not valid JSON');
+      }
 
-    if (decoded is! Map<String, dynamic>) {
-      throw const InvalidPayload(
-        'Decrypted payload is not a valid JSON object',
-      );
-    }
+      if (decoded is! Map<String, dynamic>) {
+        throw const InvalidPayload(
+          'Decrypted payload is not a valid JSON object',
+        );
+      }
 
-    return VaultPayload.fromJson(decoded);
+      return VaultPayload.fromJson(decoded);
+    } finally {
+      zeroBytes(plaintext);
+    }
   }
 
   /// Decrypts a vault file using [password].
@@ -134,13 +143,18 @@ class VaultCodec {
     final kdfParams = header.toKdfParams();
     final key = await deriveKey(password, header.salt, params: kdfParams);
 
-    final payload = await decryptWithKey(bytes: bytes, key: key);
+    try {
+      final payload = await decryptWithKey(bytes: bytes, key: key);
 
-    return (
-      payload: payload,
-      key: key,
-      salt: header.salt,
-      kdfParams: kdfParams,
-    );
+      return (
+        payload: payload,
+        key: key,
+        salt: header.salt,
+        kdfParams: kdfParams,
+      );
+    } catch (_) {
+      zeroBytes(key);
+      rethrow;
+    }
   }
 }

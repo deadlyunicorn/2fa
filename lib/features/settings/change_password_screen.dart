@@ -88,7 +88,7 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
     } on VaultException catch (e) {
       if (!mounted) return;
       setState(() {
-        _errorMessage = e.message;
+        _errorMessage = e.userFacingMessage;
       });
     } catch (e) {
       if (!mounted) return;

@@ -38,7 +38,8 @@ class VaultFormat {
 
   // DoS guard parameter limits (§5.3, §5.4)
   static const int maxMemoryKiB = 1048576; // 1 GiB in KiB
-  static const int minMemoryKiB = 1;
+  static const int minMemoryKiB =
+      8; // Argon2 requires memoryKiB >= 8 * parallelism
   static const int maxIterations = 20;
   static const int minIterations = 1;
   static const int maxParallelism = 16;
@@ -184,22 +185,21 @@ class VaultHeader {
     final nonceLength = byteData.getUint8(34);
 
     // Validate bounds (§5.3, §5.4 DoS guards)
-    if (memoryKiB < VaultFormat.minMemoryKiB ||
-        memoryKiB > VaultFormat.maxMemoryKiB) {
+    if (parallelism < VaultFormat.minParallelism ||
+        parallelism > VaultFormat.maxParallelism) {
       throw InvalidHeader(
-        'memoryKiB ($memoryKiB) out of safe bounds (1..${VaultFormat.maxMemoryKiB} KiB)',
+        'parallelism ($parallelism) out of safe bounds (${VaultFormat.minParallelism}..${VaultFormat.maxParallelism})',
+      );
+    }
+    if (memoryKiB < 8 * parallelism || memoryKiB > VaultFormat.maxMemoryKiB) {
+      throw InvalidHeader(
+        'memoryKiB ($memoryKiB) out of safe bounds (${8 * parallelism}..${VaultFormat.maxMemoryKiB} KiB)',
       );
     }
     if (iterations < VaultFormat.minIterations ||
         iterations > VaultFormat.maxIterations) {
       throw InvalidHeader(
-        'iterations ($iterations) out of safe bounds (1..${VaultFormat.maxIterations})',
-      );
-    }
-    if (parallelism < VaultFormat.minParallelism ||
-        parallelism > VaultFormat.maxParallelism) {
-      throw InvalidHeader(
-        'parallelism ($parallelism) out of safe bounds (1..${VaultFormat.maxParallelism})',
+        'iterations ($iterations) out of safe bounds (${VaultFormat.minIterations}..${VaultFormat.maxIterations})',
       );
     }
     if (saltLength != VaultFormat.saltLength) {

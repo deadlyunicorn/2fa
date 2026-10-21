@@ -289,31 +289,40 @@ void main() {
       );
     });
 
-    test(
-      'out-of-bounds memoryKiB (0 or > 1 GiB) throws InvalidHeader',
-      () async {
-        final zeroMemory = Uint8List.fromList(validVaultBytes);
-        ByteData.sublistView(zeroMemory).setUint32(7, 0, Endian.big);
-        expect(
-          () => VaultCodec.decryptWithPassword(
-            bytes: zeroMemory,
-            password: testPassword,
-          ),
-          throwsA(isA<InvalidHeader>()),
-        );
+    test('out-of-bounds memoryKiB (0, < 8 * parallelism, or > 1 GiB) throws InvalidHeader', () async {
+      final zeroMemory = Uint8List.fromList(validVaultBytes);
+      ByteData.sublistView(zeroMemory).setUint32(7, 0, Endian.big);
+      expect(
+        () => VaultCodec.decryptWithPassword(
+          bytes: zeroMemory,
+          password: testPassword,
+        ),
+        throwsA(isA<InvalidHeader>()),
+      );
 
-        final hugeMemory = Uint8List.fromList(validVaultBytes);
-        ByteData.sublistView(hugeMemory)
-            .setUint32(7, 1048577, Endian.big); // > 1 GiB
-        expect(
-          () => VaultCodec.decryptWithPassword(
-            bytes: hugeMemory,
-            password: testPassword,
-          ),
-          throwsA(isA<InvalidHeader>()),
-        );
-      },
-    );
+      // Test memoryKiB < 8 * parallelism (e.g. parallelism = 2, memoryKiB = 15)
+      final underMemory = Uint8List.fromList(validVaultBytes);
+      underMemory[15] = 2; // parallelism = 2, requires >= 16 KiB
+      ByteData.sublistView(underMemory).setUint32(7, 15, Endian.big);
+      expect(
+        () => VaultCodec.decryptWithPassword(
+          bytes: underMemory,
+          password: testPassword,
+        ),
+        throwsA(isA<InvalidHeader>()),
+      );
+
+      final hugeMemory = Uint8List.fromList(validVaultBytes);
+      ByteData.sublistView(hugeMemory)
+          .setUint32(7, 1048577, Endian.big); // > 1 GiB
+      expect(
+        () => VaultCodec.decryptWithPassword(
+          bytes: hugeMemory,
+          password: testPassword,
+        ),
+        throwsA(isA<InvalidHeader>()),
+      );
+    });
 
     test('out-of-bounds iterations (0 or > 20) throws InvalidHeader', () async {
       final zeroIter = Uint8List.fromList(validVaultBytes);
@@ -517,6 +526,52 @@ void main() {
         () => VaultCodec.decryptWithPassword(
           bytes: fileBytes,
           password: 'wrong-password-here',
+        ),
+        throwsA(isA<WrongPasswordOrCorrupted>()),
+      );
+    });
+  });
+
+  group('VaultException userFacingMessage (§1.2)', () {
+    test('UnsupportedVersion returns specific message', () {
+      const e = UnsupportedVersion('Unsupported version 99');
+      expect(e.userFacingMessage, equals('Unsupported vault format version'));
+    });
+
+    test('all other exceptions map to generic error string', () {
+      const exceptions = <VaultException>[
+        WrongPasswordOrCorrupted('AES auth error'),
+        InvalidHeader('iterations out of bounds'),
+        NotAVaultFile('Bad magic'),
+        UnsupportedKdf('KDF 99'),
+        UnsupportedCipher('Cipher 99'),
+        InvalidPayload('Bad JSON'),
+        VaultFileNotFound('Missing file'),
+      ];
+
+      for (final e in exceptions) {
+        expect(
+          e.userFacingMessage,
+          equals('Wrong password or corrupted file'),
+          reason: 'Failed for ${e.runtimeType}',
+        );
+      }
+    });
+  });
+
+  group('F-08 Key & Buffer Hygiene', () {
+    test('failed decryptWithPassword zeroes derived key', () async {
+      final sample = await VaultCodec.encryptWithPassword(
+        payload: samplePayload,
+        password: 'password1',
+        kdfParams: KdfParams.testFast,
+      );
+
+      // Decrypting with wrong password throws WrongPasswordOrCorrupted
+      await expectLater(
+        () => VaultCodec.decryptWithPassword(
+          bytes: sample.bytes,
+          password: 'wrong_password',
         ),
         throwsA(isA<WrongPasswordOrCorrupted>()),
       );

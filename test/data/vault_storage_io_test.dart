@@ -141,5 +141,41 @@ void main() {
       expect(await nestedStorage.exists(), isTrue);
       expect(await nestedStorage.read(), equals(bytes));
     });
+
+    test('F-12: cleanupStaleTemp removes leftover temporary files from prior crashed write', () async {
+      final tmpFile = File(p.join(tempDir.path, VaultStorageIo.tempFileName));
+      await tmpFile.writeAsBytes([1, 2, 3]);
+      expect(await tmpFile.exists(), isTrue);
+
+      await storage.cleanupStaleTemp();
+      expect(await tmpFile.exists(), isFalse);
+
+      // Subsequent call on non-existent tmp completes safely
+      await expectLater(storage.cleanupStaleTemp(), completes);
+    });
+
+    test('F-12: restoreBackup is atomic via temporary file and leaves no .tmp behind', () async {
+      final originalBytes = Uint8List.fromList([10, 20, 30]);
+      final modifiedBytes = Uint8List.fromList([40, 50, 60]);
+
+      await storage.writeAtomic(originalBytes);
+      await storage.writeAtomic(modifiedBytes);
+
+      // Verify state before restore
+      expect(await storage.read(), equals(modifiedBytes));
+      expect(await storage.readBackup(), equals(originalBytes));
+
+      final tmpFile = File(p.join(tempDir.path, VaultStorageIo.tempFileName));
+      expect(await tmpFile.exists(), isFalse);
+
+      await storage.restoreBackup();
+
+      // Target restored to originalBytes
+      expect(await storage.read(), equals(originalBytes));
+      // .tmp was cleanly renamed and does not exist
+      expect(await tmpFile.exists(), isFalse);
+      // .bak still preserved
+      expect(await storage.backupExists(), isTrue);
+    });
   });
 }

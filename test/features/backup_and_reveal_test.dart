@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -692,6 +693,106 @@ void main() {
         await tester.pumpAndSettle();
 
         expect(find.text('Account not found'), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'F-02: Export flow: lifecycle paused/resumed while saveVaultFile awaits does not lock the vault',
+      (tester) async {
+        await repository.createVault('password123');
+        await setupViewportAndUnlock(tester);
+
+        final saveCompleter = Completer<bool>();
+        container.updateOverrides([
+          vaultStorageProvider.overrideWithValue(storage),
+          vaultRepositoryProvider.overrideWithValue(repository),
+          sharedPreferencesProvider.overrideWithValue(prefs),
+          clipboardServiceProvider.overrideWithValue(clipboardService),
+          saveVaultFileProvider.overrideWithValue(({
+            required String fileName,
+            required Uint8List bytes,
+          }) async {
+            return saveCompleter.future;
+          }),
+          filePickerProvider.overrideWithValue(() async => null),
+        ]);
+
+        final router = container.read(routerProvider);
+        router.go('/backup');
+        await tester.pumpAndSettle();
+
+        // Tap Export Vault button
+        await tester.tap(find.widgetWithText(FilledButton, 'Export Vault'));
+        await tester.pump();
+
+        // Simulate app paused and then resumed while picker is open
+        tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+        await tester.pump();
+        expect(container.read(vaultControllerProvider), isA<VaultUnlocked>());
+
+        tester.binding.handleAppLifecycleStateChanged(
+          AppLifecycleState.resumed,
+        );
+        await tester.pump();
+        expect(container.read(vaultControllerProvider), isA<VaultUnlocked>());
+
+        saveCompleter.complete(true);
+        await tester.pumpAndSettle();
+
+        expect(find.text('Vault exported successfully'), findsOneWidget);
+        expect(container.read(vaultControllerProvider), isA<VaultUnlocked>());
+      },
+    );
+
+    testWidgets(
+      'F-02: Import flow: lifecycle paused/resumed while filePicker awaits does not lock the vault',
+      (tester) async {
+        await repository.createVault('password123');
+        await setupViewportAndUnlock(tester);
+
+        final pickCompleter = Completer<Uint8List?>();
+        container.updateOverrides([
+          vaultStorageProvider.overrideWithValue(storage),
+          vaultRepositoryProvider.overrideWithValue(repository),
+          sharedPreferencesProvider.overrideWithValue(prefs),
+          clipboardServiceProvider.overrideWithValue(clipboardService),
+          saveVaultFileProvider.overrideWithValue(
+            ({required String fileName, required Uint8List bytes}) async =>
+                true,
+          ),
+          filePickerProvider.overrideWithValue(() => pickCompleter.future),
+        ]);
+
+        final router = container.read(routerProvider);
+        router.go('/backup');
+        await tester.pumpAndSettle();
+
+        await tester.tap(
+          find.widgetWithText(FilledButton, 'Import & Merge Vault'),
+        );
+        await tester.pump();
+
+        // Simulate picker opening (lifecycle paused then resumed)
+        tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+        await tester.pump();
+        expect(container.read(vaultControllerProvider), isA<VaultUnlocked>());
+
+        tester.binding.handleAppLifecycleStateChanged(
+          AppLifecycleState.resumed,
+        );
+        await tester.pump();
+        expect(container.read(vaultControllerProvider), isA<VaultUnlocked>());
+
+        final importedBytes = (await VaultCodec.encryptWithPassword(
+          payload: VaultPayload.empty(),
+          password: 'pass',
+          kdfParams: KdfParams.testFast,
+        )).bytes;
+        pickCompleter.complete(importedBytes);
+        await tester.pumpAndSettle();
+
+        // Password prompt should appear since BackupScreen remained mounted
+        expect(find.text('Unlock Imported Vault'), findsOneWidget);
       },
     );
   });

@@ -71,6 +71,9 @@ GoRouter createRouter(Ref ref) {
 
       // If locked or unlocking, lock clears stack to /unlock
       if (vaultState is VaultLocked || vaultState is VaultUnlocking) {
+        if (vaultState is VaultUnlocking && vaultState.fromOnboarding) {
+          return isOnboarding ? null : '/onboarding';
+        }
         return isUnlock ? null : '/unlock';
       }
 

@@ -116,16 +116,22 @@ class VaultLocked extends VaultState {
 
 /// Transient state while key derivation and decryption run in the background.
 class VaultUnlocking extends VaultState {
-  const VaultUnlocking();
+  const VaultUnlocking({this.fromOnboarding = false});
+
+  final bool fromOnboarding;
 
   @override
-  bool operator ==(Object other) => other is VaultUnlocking;
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is VaultUnlocking &&
+          runtimeType == other.runtimeType &&
+          fromOnboarding == other.fromOnboarding;
 
   @override
-  int get hashCode => runtimeType.hashCode;
+  int get hashCode => Object.hash(runtimeType, fromOnboarding);
 
   @override
-  String toString() => 'VaultUnlocking()';
+  String toString() => 'VaultUnlocking(fromOnboarding: $fromOnboarding)';
 }
 
 /// Unlocked state holding the decrypted [VaultPayload] in memory (§4.1).
@@ -202,6 +208,7 @@ class _AsyncMutex {
 /// Controller managing overall vault authentication and serialized payload mutations (§4.1).
 class VaultController extends Notifier<VaultState> {
   final _AsyncMutex _mutex = _AsyncMutex();
+  int _sessionGeneration = 0;
 
   VaultRepository get _repository => ref.read(vaultRepositoryProvider);
 
@@ -224,32 +231,42 @@ class VaultController extends Notifier<VaultState> {
 
   /// Creates a new empty vault initialized with [password] (§5.2, §7.1 #1).
   Future<void> create(String password) async {
-    state = const VaultUnlocking();
+    final isFromOnboarding = state is VaultNoVault;
+    state = VaultUnlocking(fromOnboarding: isFromOnboarding);
     try {
       final payload = await _repository.createVault(password);
       state = VaultUnlocked(payload);
     } catch (e) {
-      state = VaultError(e.toString());
+      final hasVault = await _repository.hasVault();
+      final hasBackup = await _repository.hasBackup();
+      if (!hasVault) {
+        state = VaultNoVault(hasBackup: hasBackup);
+      } else {
+        state = VaultError(e.toString());
+      }
       rethrow;
     }
   }
 
   /// Imports an external vault file during onboarding (§7.1 #1).
   Future<void> importInitialVault(Uint8List bytes, String password) async {
-    state = const VaultUnlocking();
+    final isFromOnboarding = state is VaultNoVault;
+    state = VaultUnlocking(fromOnboarding: isFromOnboarding);
     try {
       final payload = await _repository.importAsNewVault(bytes, password);
       state = VaultUnlocked(payload);
     } catch (e) {
       final hasVault = await _repository.hasVault();
       final hasBackup = await _repository.hasBackup();
-      if (hasVault) {
+      if (!hasVault) {
+        state = VaultNoVault(hasBackup: hasBackup);
+      } else {
         state = VaultLocked(
-          errorMessage: e is VaultException ? e.message : e.toString(),
+          errorMessage: e is VaultException
+              ? e.userFacingMessage
+              : e.toString(),
           hasBackup: hasBackup,
         );
-      } else {
-        state = VaultNoVault(hasBackup: hasBackup);
       }
       rethrow;
     }
@@ -284,7 +301,7 @@ class VaultController extends Notifier<VaultState> {
           ? DateTime.now().add(Duration(seconds: delay))
           : null;
       final msg = e is VaultException
-          ? e.message
+          ? e.userFacingMessage
           : 'Wrong password or corrupted file';
       state = VaultLocked(
         errorMessage: msg,
@@ -297,21 +314,29 @@ class VaultController extends Notifier<VaultState> {
 
   /// Restores and unlocks the vault from the `.bak` file using [password] (§5.6, §7.1 #2).
   Future<void> restoreBackup(String password) async {
-    state = const VaultUnlocking();
+    final isFromOnboarding = state is VaultNoVault;
+    state = VaultUnlocking(fromOnboarding: isFromOnboarding);
     try {
       final payload = await _repository.restoreFromBackup(password);
       state = VaultUnlocked(payload);
     } catch (e) {
+      final hasVault = await _repository.hasVault();
       final hasBackup = await _repository.hasBackup();
-      final msg = e is VaultException
-          ? e.message
-          : 'Wrong password or corrupted file';
-      state = VaultLocked(errorMessage: msg, hasBackup: hasBackup);
+      if (!hasVault) {
+        state = VaultNoVault(hasBackup: hasBackup);
+      } else {
+        final msg = e is VaultException
+            ? e.userFacingMessage
+            : 'Wrong password or corrupted file';
+        state = VaultLocked(errorMessage: msg, hasBackup: hasBackup);
+      }
+      rethrow;
     }
   }
 
   /// Locks the vault and zeroes memory credentials (§5.2).
   Future<void> lock() async {
+    _sessionGeneration++;
     _repository.lock();
     state = const VaultLocked();
     final hasBackup = await _repository.hasBackup();
@@ -320,6 +345,7 @@ class VaultController extends Notifier<VaultState> {
 
   /// Resets the app by wiping persistent files and zeroing in-memory keys (§7.1 #2).
   Future<void> resetVault() async {
+    _sessionGeneration++;
     await _repository.deleteVault();
     state = const VaultNoVault(hasBackup: false);
   }
@@ -332,8 +358,11 @@ class VaultController extends Notifier<VaultState> {
   /// Changes the master password and re-encrypts the vault (§5.2, §7.1 #12).
   Future<void> changePassword(String oldPassword, String newPassword) {
     return _mutex.run(() async {
+      final gen = _sessionGeneration;
       final currentState = state;
-      if (currentState is! VaultUnlocked) {
+      if (currentState is! VaultUnlocked ||
+          gen != _sessionGeneration ||
+          !_repository.isUnlocked) {
         throw StateError('Cannot change password: vault is not unlocked');
       }
       await _repository.changePassword(
@@ -341,6 +370,12 @@ class VaultController extends Notifier<VaultState> {
         newPassword,
         currentState.data,
       );
+      if (gen != _sessionGeneration ||
+          !_repository.isUnlocked ||
+          state is! VaultUnlocked) {
+        _repository.lock();
+        return;
+      }
     });
   }
 
@@ -350,12 +385,25 @@ class VaultController extends Notifier<VaultState> {
     action,
   ) {
     return _mutex.run(() async {
+      final gen = _sessionGeneration;
       final currentState = state;
-      if (currentState is! VaultUnlocked) {
+      if (currentState is! VaultUnlocked ||
+          gen != _sessionGeneration ||
+          !_repository.isUnlocked) {
         throw StateError('Cannot mutate vault: vault is not unlocked');
       }
       final outcome = await action(currentState.data);
+      if (gen != _sessionGeneration ||
+          !_repository.isUnlocked ||
+          state is! VaultUnlocked) {
+        return outcome.result;
+      }
       await _repository.save(outcome.payload);
+      if (gen != _sessionGeneration ||
+          !_repository.isUnlocked ||
+          state is! VaultUnlocked) {
+        return outcome.result;
+      }
       state = VaultUnlocked(outcome.payload);
       return outcome.result;
     });
@@ -587,8 +635,11 @@ class VaultController extends Notifier<VaultState> {
   /// Imports an external vault file and merges entries into the current vault (§4.1, §6.4, §7.1 #11).
   Future<MergeReport> importAndMerge(Uint8List bytes, String password) {
     return _mutex.run(() async {
+      final gen = _sessionGeneration;
       final currentState = state;
-      if (currentState is! VaultUnlocked) {
+      if (currentState is! VaultUnlocked ||
+          gen != _sessionGeneration ||
+          !_repository.isUnlocked) {
         throw StateError('Cannot import and merge: vault is not unlocked');
       }
       final result = await _repository.importAndMerge(
@@ -596,6 +647,12 @@ class VaultController extends Notifier<VaultState> {
         password,
         currentState.data,
       );
+      if (gen != _sessionGeneration ||
+          !_repository.isUnlocked ||
+          state is! VaultUnlocked) {
+        _repository.lock();
+        return result.report;
+      }
       state = VaultUnlocked(result.merged);
       return result.report;
     });

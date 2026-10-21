@@ -443,5 +443,63 @@ void main() {
       expect(find.byType(ManualEntryScreen), findsOneWidget);
       expect(find.widgetWithText(TextField, 'GitHub'), findsOneWidget);
     });
+
+    testWidgets(
+      'F-02: Image QR import: lifecycle paused/resumed while imagePicker awaits does not lock the vault',
+      (tester) async {
+        await repository.createVault('password123');
+
+        final pickCompleter = Completer<Uint8List?>();
+
+        await tester.pumpWidget(
+          ProviderScope(
+            overrides: [
+              vaultStorageProvider.overrideWithValue(storage),
+              vaultRepositoryProvider.overrideWithValue(repository),
+              sharedPreferencesProvider.overrideWithValue(prefs),
+              clipboardServiceProvider.overrideWithValue(clipboardService),
+              imagePickerProvider.overrideWithValue(() => pickCompleter.future),
+              qrImageDecoderProvider.overrideWithValue(
+                (bytes) async => 'otpauth://totp/GitHub:alice@test.com?secret=JBSWY3DPEHPK3PXP',
+              ),
+            ],
+            child: const Offline2faApp(),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        // Unlock
+        await tester.enterText(find.byType(TextField).first, 'password123');
+        await tester.tap(find.widgetWithText(FilledButton, 'Unlock'));
+        await tester.pumpAndSettle();
+
+        // Navigate to /add
+        await tester.tap(find.byTooltip('Add account'));
+        await tester.pumpAndSettle();
+
+        // Tap Load QR from Image File
+        await tester.tap(
+          find.widgetWithText(OutlinedButton, 'Load QR from Image File'),
+        );
+        await tester.pump();
+
+        // Simulate picker opening (lifecycle paused then resumed)
+        tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+        await tester.pump();
+
+        tester.binding.handleAppLifecycleStateChanged(
+          AppLifecycleState.resumed,
+        );
+        await tester.pump();
+
+        // Provide valid image bytes to completer
+        pickCompleter.complete(validTotpPngBytes);
+        await tester.pumpAndSettle();
+
+        // Should have decoded QR and opened manual entry screen
+        expect(find.byType(ManualEntryScreen), findsOneWidget);
+        expect(find.widgetWithText(TextField, 'GitHub'), findsOneWidget);
+      },
+    );
   });
 }

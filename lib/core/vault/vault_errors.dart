@@ -4,6 +4,14 @@ sealed class VaultException implements Exception {
 
   final String message;
 
+  /// User-facing error message (§1.2).
+  String get userFacingMessage {
+    if (this is UnsupportedVersion) {
+      return 'Unsupported vault format version';
+    }
+    return 'Wrong password or corrupted file';
+  }
+
   @override
   String toString() => '$runtimeType: $message';
 }

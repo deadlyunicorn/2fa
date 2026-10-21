@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:cryptography/cryptography.dart';
 
 import '../vault/vault_errors.dart';
+import 'secure_bytes.dart';
 
 /// AES-256-GCM authenticated encryption and decryption helpers (§5.2, §5.4).
 class AeadCipher {
@@ -34,12 +35,18 @@ class AeadCipher {
       );
     }
 
-    final secretBox = await _algorithm.encrypt(
-      plaintext,
-      secretKey: SecretKey(key),
-      nonce: nonce,
-      aad: aad,
-    );
+    final keyCopy = Uint8List.fromList(key);
+    final SecretBox secretBox;
+    try {
+      secretBox = await _algorithm.encrypt(
+        plaintext,
+        secretKey: SecretKey(keyCopy),
+        nonce: nonce,
+        aad: aad,
+      );
+    } finally {
+      zeroBytes(keyCopy);
+    }
 
     final cipherText = secretBox.cipherText;
     final macBytes = secretBox.mac.bytes;
@@ -83,10 +90,11 @@ class AeadCipher {
 
     final secretBox = SecretBox(cipherText, nonce: nonce, mac: Mac(macBytes));
 
+    final keyCopy = Uint8List.fromList(key);
     try {
       final clearText = await _algorithm.decrypt(
         secretBox,
-        secretKey: SecretKey(key),
+        secretKey: SecretKey(keyCopy),
         aad: aad,
       );
       return Uint8List.fromList(clearText);
@@ -94,6 +102,8 @@ class AeadCipher {
       throw const WrongPasswordOrCorrupted();
     } catch (_) {
       throw const WrongPasswordOrCorrupted();
+    } finally {
+      zeroBytes(keyCopy);
     }
   }
 }

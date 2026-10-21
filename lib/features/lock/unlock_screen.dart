@@ -78,7 +78,11 @@ class _UnlockScreenState extends ConsumerState<UnlockScreen> {
     );
     if (password == null || !mounted) return;
 
-    await ref.read(vaultControllerProvider.notifier).restoreBackup(password);
+    try {
+      await ref.read(vaultControllerProvider.notifier).restoreBackup(password);
+    } catch (_) {
+      // Error message is stored in VaultLocked state and displayed on screen
+    }
   }
 
   Future<void> _handleResetVault() async {

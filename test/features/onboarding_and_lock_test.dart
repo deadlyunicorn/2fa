@@ -5,11 +5,17 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:offline2fa/app.dart';
 import 'package:offline2fa/core/crypto/kdf.dart';
+import 'package:offline2fa/core/vault/vault_codec.dart';
 import 'package:offline2fa/core/vault/vault_errors.dart';
+import 'package:offline2fa/core/vault/vault_payload.dart';
 import 'package:offline2fa/data/prefs_repository.dart';
+import 'package:offline2fa/data/vault_controller.dart';
 import 'package:offline2fa/data/vault_repository.dart';
 import 'package:offline2fa/data/vault_storage.dart';
+import 'package:offline2fa/features/lock/unlock_screen.dart';
+import 'package:offline2fa/features/onboarding/onboarding_screen.dart';
 import 'package:offline2fa/shared/file_picker_service.dart';
+import 'package:offline2fa/shared/widgets/busy_overlay.dart';
 import 'package:offline2fa/shared/widgets/obscured_text_field.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -497,5 +503,184 @@ void main() {
         expect(find.text('No accounts yet'), findsOneWidget);
       },
     );
+
+    group('F-03 Regression: Onboarding asynchronous operations & routing', () {
+      testWidgets(
+        'During create on /onboarding, the router stays on /onboarding and shows BusyOverlay (never flashes /unlock)',
+        (WidgetTester tester) async {
+          final delayedRepo = DelayedVaultRepository(
+            storage: storage,
+            delay: const Duration(milliseconds: 100),
+          );
+          await tester.pumpWidget(
+            ProviderScope(
+              overrides: [
+                vaultStorageProvider.overrideWithValue(storage),
+                vaultRepositoryProvider.overrideWithValue(delayedRepo),
+                sharedPreferencesProvider.overrideWithValue(prefs),
+              ],
+              child: const Offline2faApp(),
+            ),
+          );
+          await tester.pumpAndSettle();
+
+          expect(find.byType(OnboardingScreen), findsOneWidget);
+
+          final passwordFields = find.byType(ObscuredTextField);
+          await tester.enterText(passwordFields.at(0), 'password123');
+          await tester.enterText(passwordFields.at(1), 'password123');
+          await tester.tap(find.byType(CheckboxListTile));
+          await tester.pump();
+
+          // Tap Create vault
+          await tester.tap(find.widgetWithText(FilledButton, 'Create vault'));
+          await tester.pump(const Duration(milliseconds: 20));
+
+          // In flight: router stays on OnboardingScreen, never flashes UnlockScreen
+          expect(find.byType(OnboardingScreen), findsOneWidget);
+          expect(find.byType(UnlockScreen), findsNothing);
+          expect(
+            find.byWidgetPredicate((w) => w is BusyOverlay && w.isBusy),
+            findsOneWidget,
+          );
+
+          // Advance until complete
+          await tester.pumpAndSettle();
+          expect(find.text('No accounts yet'), findsOneWidget);
+        },
+      );
+
+      testWidgets(
+        'When importInitialVault fails with wrong password after async delay, user remains on /onboarding and sees error without setState after dispose',
+        (WidgetTester tester) async {
+          final delayedRepo = DelayedVaultRepository(
+            storage: storage,
+            delay: const Duration(milliseconds: 100),
+          );
+
+          final validVaultBytes = (await VaultCodec.encryptWithPassword(
+            payload: VaultPayload.empty(),
+            password: 'correct-password',
+            kdfParams: KdfParams.testFast,
+          )).bytes;
+
+          await tester.pumpWidget(
+            ProviderScope(
+              overrides: [
+                vaultStorageProvider.overrideWithValue(storage),
+                vaultRepositoryProvider.overrideWithValue(delayedRepo),
+                sharedPreferencesProvider.overrideWithValue(prefs),
+                filePickerProvider.overrideWithValue(
+                  () async => validVaultBytes,
+                ),
+              ],
+              child: const Offline2faApp(),
+            ),
+          );
+          await tester.pumpAndSettle();
+
+          // Tap Import existing vault
+          await tester.tap(find.text('Import existing vault'));
+          await tester.pumpAndSettle();
+
+          // Enter wrong password in dialog
+          expect(find.text('Import Vault'), findsOneWidget);
+          await tester.enterText(find.byType(TextField).last, 'wrong-password');
+          await tester.tap(find.widgetWithText(FilledButton, 'Import'));
+          await tester.pump(const Duration(milliseconds: 20));
+
+          // In flight: still on OnboardingScreen, UnlockScreen never appears
+          expect(find.byType(OnboardingScreen), findsOneWidget);
+          expect(find.byType(UnlockScreen), findsNothing);
+
+          // Complete the async operation
+          await tester.pumpAndSettle();
+
+          // Remained on OnboardingScreen, shows error message, no dispose errors
+          expect(find.byType(OnboardingScreen), findsOneWidget);
+          expect(find.byType(UnlockScreen), findsNothing);
+          expect(
+            find.text('Wrong password or corrupted file'),
+            findsAtLeastNWidgets(1),
+          );
+        },
+      );
+
+      testWidgets(
+        'When create fails, state returns to VaultNoVault on /onboarding (not stuck on /unlock)',
+        (WidgetTester tester) async {
+          final delayedRepo = DelayedVaultRepository(
+            storage: storage,
+            delay: const Duration(milliseconds: 50),
+            failCreate: true,
+          );
+
+          late ProviderContainer testContainer;
+          await tester.pumpWidget(
+            ProviderScope(
+              overrides: [
+                vaultStorageProvider.overrideWithValue(storage),
+                vaultRepositoryProvider.overrideWithValue(delayedRepo),
+                sharedPreferencesProvider.overrideWithValue(prefs),
+              ],
+              child: Consumer(
+                builder: (context, ref, child) {
+                  testContainer = ProviderScope.containerOf(context);
+                  return const Offline2faApp();
+                },
+              ),
+            ),
+          );
+          await tester.pumpAndSettle();
+
+          final passwordFields = find.byType(ObscuredTextField);
+          await tester.enterText(passwordFields.at(0), 'password123');
+          await tester.enterText(passwordFields.at(1), 'password123');
+          await tester.tap(find.byType(CheckboxListTile));
+          await tester.pump();
+
+          // Tap Create vault (fails)
+          await tester.tap(find.widgetWithText(FilledButton, 'Create vault'));
+          await tester.pumpAndSettle();
+
+          // User remains on /onboarding, state is VaultNoVault
+          expect(find.byType(OnboardingScreen), findsOneWidget);
+          expect(find.byType(UnlockScreen), findsNothing);
+          expect(
+            testContainer.read(vaultControllerProvider),
+            isA<VaultNoVault>(),
+          );
+        },
+      );
+    });
   });
+}
+
+class DelayedVaultRepository extends VaultRepository {
+  DelayedVaultRepository({
+    required super.storage,
+    this.delay = const Duration(milliseconds: 50),
+    this.failCreate = false,
+  }) : super(defaultKdfParams: KdfParams.testFast);
+
+  final Duration delay;
+  final bool failCreate;
+
+  @override
+  Future<VaultPayload> createVault(String password) async {
+    await Future<void>.delayed(delay);
+    if (failCreate) {
+      throw const VaultFileNotFound('Simulated create storage error');
+    }
+    return super.createVault(password);
+  }
+
+  @override
+  Future<VaultPayload> importAsNewVault(
+    Uint8List bytes,
+    String password,
+  ) async {
+    await Future<void>.delayed(delay);
+    return super.importAsNewVault(bytes, password);
+  }
 }

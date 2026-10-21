@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/otp/otpauth_uri.dart';
 import '../../core/platform/platform_caps.dart';
+import '../../shared/auto_lock_service.dart';
 import '../../shared/file_picker_service.dart';
 import '../../shared/widgets/responsive_wrapper.dart';
 import 'manual_entry_screen.dart';
@@ -22,7 +23,9 @@ Future<void> handleImageQrImport(
   bool replace = false,
 }) async {
   final pickImage = ref.read(imagePickerProvider);
-  final bytes = await pickImage();
+  final bytes = await ref
+      .read(autoLockSuppressProvider.notifier)
+      .runSuppressed(() => pickImage());
   if (bytes == null || !context.mounted) {
     return;
   }

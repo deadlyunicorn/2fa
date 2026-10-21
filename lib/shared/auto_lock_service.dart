@@ -30,6 +30,40 @@ class AutoLockService {
   }
 }
 
+/// Manages temporary suppression of auto-lock during external system picker interactions (§5.7).
+class AutoLockSuppressNotifier extends Notifier<int> {
+  DateTime? _graceUntil;
+
+  @override
+  int build() => 0;
+
+  /// Returns true if auto-lock is currently suppressed or within the post-picker grace window.
+  bool get isSuppressed {
+    if (state > 0) return true;
+    if (_graceUntil != null && DateTime.now().isBefore(_graceUntil!)) {
+      return true;
+    }
+    return false;
+  }
+
+  /// Runs [action] while incrementing the suppression counter and setting a post-completion grace window.
+  Future<T> runSuppressed<T>(Future<T> Function() action) async {
+    state = state + 1;
+    try {
+      return await action();
+    } finally {
+      state = (state - 1).clamp(0, 999999);
+      _graceUntil = DateTime.now().add(const Duration(seconds: 1));
+    }
+  }
+}
+
+/// Provider managing auto-lock suppression counter.
+final autoLockSuppressProvider =
+    NotifierProvider<AutoLockSuppressNotifier, int>(
+      AutoLockSuppressNotifier.new,
+    );
+
 /// Global widget listening to user activity (pointer + keyboard) and lifecycle states
 /// to enforce auto-lock and background lock runtime protections (§5.7, §9 M4).
 class AutoLockListener extends ConsumerStatefulWidget {
@@ -61,6 +95,14 @@ class _AutoLockListenerState extends ConsumerState<AutoLockListener>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    final suppressor = ref.read(autoLockSuppressProvider.notifier);
+    if (suppressor.isSuppressed) {
+      if (state == AppLifecycleState.resumed) {
+        _resetInactivityTimer();
+      }
+      return;
+    }
+
     if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.hidden) {
       final prefs = ref.read(prefsProvider);
@@ -68,6 +110,8 @@ class _AutoLockListenerState extends ConsumerState<AutoLockListener>
       if (prefs.lockOnBackground && vaultState is VaultUnlocked) {
         ref.read(vaultControllerProvider.notifier).lock();
       }
+    } else if (state == AppLifecycleState.resumed) {
+      _resetInactivityTimer();
     }
   }
 

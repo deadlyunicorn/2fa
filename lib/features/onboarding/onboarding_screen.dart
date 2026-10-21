@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/platform/platform_caps.dart';
 import '../../core/vault/vault_errors.dart';
 import '../../data/vault_controller.dart';
+import '../../shared/auto_lock_service.dart';
 import '../../shared/file_picker_service.dart';
 import '../../shared/widgets/busy_overlay.dart';
 import '../../shared/widgets/obscured_text_field.dart';
@@ -23,6 +24,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   final TextEditingController _passwordController = TextEditingController();
   final TextEditingController _confirmController = TextEditingController();
   bool _disclaimerAccepted = false;
+  bool _isBusy = false;
   String? _errorMessage;
 
   @override
@@ -55,22 +57,28 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
 
   Future<void> _handleCreateVault() async {
     if (!_canCreateVault) return;
-    setState(() => _errorMessage = null);
+    setState(() {
+      _errorMessage = null;
+      _isBusy = true;
+    });
 
     try {
       await ref
           .read(vaultControllerProvider.notifier)
           .create(_passwordController.text);
     } catch (e) {
-      final msg = e is VaultException ? e.message : e.toString();
+      if (!mounted) return;
+      final msg = e is VaultException ? e.userFacingMessage : e.toString();
       setState(() => _errorMessage = msg);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(msg),
+          backgroundColor: Theme.of(context).colorScheme.error,
+        ),
+      );
+    } finally {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(msg),
-            backgroundColor: Theme.of(context).colorScheme.error,
-          ),
-        );
+        setState(() => _isBusy = false);
       }
     }
   }
@@ -79,7 +87,9 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     setState(() => _errorMessage = null);
     try {
       final pickFile = ref.read(filePickerProvider);
-      final bytes = await pickFile();
+      final bytes = await ref
+          .read(autoLockSuppressProvider.notifier)
+          .runSuppressed(() => pickFile());
       if (bytes == null || !mounted) return;
 
       final password = await PasswordPromptDialog.show(
@@ -90,21 +100,25 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       );
       if (password == null || !mounted) return;
 
+      setState(() => _isBusy = true);
       await ref
           .read(vaultControllerProvider.notifier)
           .importInitialVault(bytes, password);
     } catch (e) {
+      if (!mounted) return;
       final msg = e is VaultException
-          ? e.message
+          ? e.userFacingMessage
           : 'Failed to import vault: wrong password or corrupted file';
       setState(() => _errorMessage = msg);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(msg),
+          backgroundColor: Theme.of(context).colorScheme.error,
+        ),
+      );
+    } finally {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(msg),
-            backgroundColor: Theme.of(context).colorScheme.error,
-          ),
-        );
+        setState(() => _isBusy = false);
       }
     }
   }
@@ -119,18 +133,24 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     );
     if (password == null || !mounted) return;
 
+    setState(() => _isBusy = true);
     try {
       await ref.read(vaultControllerProvider.notifier).restoreBackup(password);
     } catch (e) {
-      final msg = e is VaultException ? e.message : 'Failed to restore backup';
+      if (!mounted) return;
+      final msg = e is VaultException
+          ? e.userFacingMessage
+          : 'Failed to restore backup';
       setState(() => _errorMessage = msg);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(msg),
+          backgroundColor: Theme.of(context).colorScheme.error,
+        ),
+      );
+    } finally {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(msg),
-            backgroundColor: Theme.of(context).colorScheme.error,
-          ),
-        );
+        setState(() => _isBusy = false);
       }
     }
   }
@@ -138,7 +158,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   @override
   Widget build(BuildContext context) {
     final vaultState = ref.watch(vaultControllerProvider);
-    final isBusy = vaultState is VaultUnlocking;
+    final isBusy = _isBusy || vaultState is VaultUnlocking;
     final hasBackup = vaultState is VaultNoVault && vaultState.hasBackup;
     final theme = Theme.of(context);
 

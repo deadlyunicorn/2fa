@@ -5,6 +5,7 @@ import '../../core/platform/platform_caps.dart';
 import '../../core/vault/vault_errors.dart';
 import '../../core/vault/vault_merge.dart';
 import '../../data/vault_controller.dart';
+import '../../shared/auto_lock_service.dart';
 import '../../shared/file_picker_service.dart';
 import '../../shared/widgets/busy_overlay.dart';
 import '../../shared/widgets/password_prompt_dialog.dart';
@@ -34,7 +35,11 @@ class _BackupScreenState extends ConsumerState<BackupScreen> {
           .exportBytes();
       final defaultFileName = generateVaultBackupFileName();
       final saveFile = ref.read(saveVaultFileProvider);
-      final saved = await saveFile(fileName: defaultFileName, bytes: bytes);
+      final saved = await ref
+          .read(autoLockSuppressProvider.notifier)
+          .runSuppressed(
+            () => saveFile(fileName: defaultFileName, bytes: bytes),
+          );
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).hideCurrentSnackBar();
@@ -65,7 +70,9 @@ class _BackupScreenState extends ConsumerState<BackupScreen> {
 
   Future<void> _importAndMergeVault() async {
     final pickFile = ref.read(filePickerProvider);
-    final bytes = await pickFile();
+    final bytes = await ref
+        .read(autoLockSuppressProvider.notifier)
+        .runSuppressed(() => pickFile());
     if (bytes == null || !mounted) return;
 
     final password = await PasswordPromptDialog.show(
@@ -98,7 +105,7 @@ class _BackupScreenState extends ConsumerState<BackupScreen> {
       ScaffoldMessenger.of(context).hideCurrentSnackBar();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(e.message),
+          content: Text(e.userFacingMessage),
           backgroundColor: Theme.of(context).colorScheme.error,
           behavior: SnackBarBehavior.floating,
         ),

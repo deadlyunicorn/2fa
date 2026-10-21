@@ -628,5 +628,178 @@ void main() {
       expect(tick, closeTo(expectedSecond, 2));
       sub.close();
     });
+
+    group('F-01 Regression: In-flight mutations racing with lock()', () {
+      test(
+        'lock() during an in-flight addEntry leaves the vault locked',
+        () async {
+          final storage = GatedStorage();
+          final repo = VaultRepository(
+            storage: storage,
+            defaultKdfParams: KdfParams.testFast,
+          );
+          final testContainer = ProviderContainer(
+            overrides: [
+              vaultStorageProvider.overrideWithValue(storage),
+              vaultRepositoryProvider.overrideWithValue(repo),
+            ],
+          );
+          addTearDown(testContainer.dispose);
+          final ctrl = testContainer.read(vaultControllerProvider.notifier);
+          await ctrl.create('password123');
+
+          storage.gate = Completer<void>();
+          final entry = OtpEntry(
+            id: 'e1',
+            type: OtpType.totp,
+            issuer: 'X',
+            account: 'y',
+            secret: 'JBSWY3DPEHPK3PXP',
+          );
+          final pending = ctrl.addEntry(entry);
+          await Future<void>.delayed(Duration.zero);
+
+          await ctrl.lock();
+          expect(
+            testContainer.read(vaultControllerProvider),
+            isA<VaultLocked>(),
+          );
+
+          storage.gate!.complete();
+          await pending;
+
+          final state = testContainer.read(vaultControllerProvider);
+          expect(
+            state,
+            isA<VaultLocked>(),
+            reason: 'state=$state, repo.isUnlocked=${repo.isUnlocked}',
+          );
+          expect(repo.isUnlocked, isFalse);
+        },
+      );
+
+      test(
+        'lock() during an in-flight importAndMerge leaves the vault locked',
+        () async {
+          final storage = GatedStorage();
+          final repo = VaultRepository(
+            storage: storage,
+            defaultKdfParams: KdfParams.testFast,
+          );
+          final testContainer = ProviderContainer(
+            overrides: [
+              vaultStorageProvider.overrideWithValue(storage),
+              vaultRepositoryProvider.overrideWithValue(repo),
+            ],
+          );
+          addTearDown(testContainer.dispose);
+          final ctrl = testContainer.read(vaultControllerProvider.notifier);
+          await ctrl.create('password123');
+
+          final importedBytes = (await VaultCodec.encryptWithPassword(
+            payload: VaultPayload(
+              schemaVersion: 1,
+              createdAt: DateTime.now().toUtc(),
+              modifiedAt: DateTime.now().toUtc(),
+              groups: const [],
+              entries: [
+                OtpEntry(
+                  id: 'imp1',
+                  type: OtpType.totp,
+                  issuer: 'Imported',
+                  account: 'user@imp.com',
+                  secret: 'JBSWY3DPEHPK3PXP',
+                ),
+              ],
+            ),
+            password: 'importedPass',
+            kdfParams: KdfParams.testFast,
+          )).bytes;
+
+          storage.gate = Completer<void>();
+          final pending = ctrl.importAndMerge(importedBytes, 'importedPass');
+          await Future<void>.delayed(Duration.zero);
+
+          await ctrl.lock();
+          expect(
+            testContainer.read(vaultControllerProvider),
+            isA<VaultLocked>(),
+          );
+
+          storage.gate!.complete();
+          await pending;
+
+          final state = testContainer.read(vaultControllerProvider);
+          expect(state, isA<VaultLocked>());
+          expect(repo.isUnlocked, isFalse);
+        },
+      );
+
+      test(
+        'lock() during an in-flight changePassword leaves the vault locked',
+        () async {
+          final storage = GatedStorage();
+          final repo = VaultRepository(
+            storage: storage,
+            defaultKdfParams: KdfParams.testFast,
+          );
+          final testContainer = ProviderContainer(
+            overrides: [
+              vaultStorageProvider.overrideWithValue(storage),
+              vaultRepositoryProvider.overrideWithValue(repo),
+            ],
+          );
+          addTearDown(testContainer.dispose);
+          final ctrl = testContainer.read(vaultControllerProvider.notifier);
+          await ctrl.create('password123');
+
+          storage.gate = Completer<void>();
+          final pending = ctrl.changePassword('password123', 'newPassword456');
+          await Future<void>.delayed(Duration.zero);
+
+          await ctrl.lock();
+          expect(
+            testContainer.read(vaultControllerProvider),
+            isA<VaultLocked>(),
+          );
+
+          storage.gate!.complete();
+          await pending;
+
+          final state = testContainer.read(vaultControllerProvider);
+          expect(state, isA<VaultLocked>());
+          expect(repo.isUnlocked, isFalse);
+          expect(repo.derivedKey, isNull);
+        },
+      );
+    });
   });
+}
+
+class GatedStorage implements VaultStorage {
+  Uint8List? main;
+  Uint8List? bak;
+  Completer<void>? gate;
+
+  @override
+  Future<bool> exists() async => main != null;
+  @override
+  Future<bool> backupExists() async => bak != null;
+  @override
+  Future<Uint8List> read() async =>
+      main ?? (throw const VaultFileNotFound('none'));
+  @override
+  Future<Uint8List> readBackup() async =>
+      bak ?? (throw const VaultFileNotFound('none'));
+  @override
+  Future<void> writeAtomic(Uint8List bytes) async {
+    if (gate != null) await gate!.future;
+    if (main != null) bak = main;
+    main = Uint8List.fromList(bytes);
+  }
+
+  @override
+  Future<void> restoreBackup() async => main = bak;
+  @override
+  Future<void> delete() async => main = bak = null;
 }

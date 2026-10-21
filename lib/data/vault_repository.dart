@@ -206,21 +206,31 @@ class VaultRepository {
       params: defaultKdfParams,
     );
 
-    final bytes = await VaultCodec.encryptWithKey(
-      payload: currentPayload,
-      key: newKey,
-      salt: newSalt,
-      kdfParams: defaultKdfParams,
-    );
-    await storage.writeAtomic(bytes);
+    try {
+      final bytes = await VaultCodec.encryptWithKey(
+        payload: currentPayload,
+        key: newKey,
+        salt: newSalt,
+        kdfParams: defaultKdfParams,
+      );
+      await storage.writeAtomic(bytes);
 
-    final oldKey = _derivedKey;
-    _derivedKey = newKey;
-    _salt = newSalt;
-    _kdfParams = defaultKdfParams;
+      if (_derivedKey == null) {
+        zeroBytes(newKey);
+        return;
+      }
 
-    if (oldKey != null) {
-      zeroBytes(oldKey);
+      final oldKey = _derivedKey;
+      _derivedKey = newKey;
+      _salt = newSalt;
+      _kdfParams = defaultKdfParams;
+
+      if (oldKey != null) {
+        zeroBytes(oldKey);
+      }
+    } catch (_) {
+      zeroBytes(newKey);
+      rethrow;
     }
   }
 

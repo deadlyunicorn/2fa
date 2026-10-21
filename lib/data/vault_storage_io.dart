@@ -31,6 +31,14 @@ class VaultStorageIo implements VaultStorage {
     return File(p.join(dir.path, filename));
   }
 
+  /// Removes leftover `.tmp` files from any prior interrupted write (§5.6).
+  Future<void> cleanupStaleTemp() async {
+    final tmp = await _getFile(tempFileName);
+    if (await tmp.exists()) {
+      await tmp.delete();
+    }
+  }
+
   @override
   Future<bool> exists() async {
     final Directory dir = await _directoryProvider();
@@ -86,10 +94,12 @@ class VaultStorageIo implements VaultStorage {
   Future<void> restoreBackup() async {
     final target = await _getFile(mainFileName);
     final bak = await _getFile(backupFileName);
+    final tmp = await _getFile(tempFileName);
     if (!await bak.exists()) {
       throw const VaultFileNotFound('Backup vault file does not exist');
     }
-    await bak.copy(target.path);
+    await bak.copy(tmp.path);
+    await tmp.rename(target.path);
   }
 
   @override
