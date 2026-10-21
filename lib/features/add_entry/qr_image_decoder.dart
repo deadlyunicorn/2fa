@@ -1,6 +1,7 @@
 import 'dart:isolate';
 import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image/image.dart' as img;
 import 'package:zxing2/qrcode.dart';
@@ -44,13 +45,18 @@ String? decodeQrFromImageBytesSync(Uint8List bytes) {
   }
 }
 
-/// Asynchronous wrapper executing [decodeQrFromImageBytesSync] in a background isolate.
+/// Asynchronous wrapper executing [decodeQrFromImageBytesSync] in a background isolate on native,
+/// or synchronously after yielding to the event loop on Web (§9 M10).
 Future<String?> decodeQrFromImageBytes(
   Uint8List bytes, {
   bool runInIsolate = true,
 }) async {
   if (bytes.isEmpty) {
     return null;
+  }
+  if (kIsWeb) {
+    await Future<void>.delayed(Duration.zero);
+    return decodeQrFromImageBytesSync(bytes);
   }
   if (!runInIsolate) {
     return decodeQrFromImageBytesSync(bytes);

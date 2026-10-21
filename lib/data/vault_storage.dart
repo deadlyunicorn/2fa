@@ -1,6 +1,9 @@
 import 'dart:typed_data';
 
-import '../core/vault/vault_errors.dart';
+import 'vault_storage_stub.dart'
+    if (dart.library.io) 'vault_storage_io.dart'
+    if (dart.library.js_interop) 'vault_storage_web.dart'
+    as impl;
 
 /// Interface for persistent storage of encrypted vault data (§5.6).
 abstract class VaultStorage {
@@ -34,3 +37,6 @@ abstract class VaultStorage {
   /// Deletes the primary vault file, backup file, and any temporary file.
   Future<void> delete();
 }
+
+/// Creates the platform-appropriate default [VaultStorage] instance (§5.6, §8, §9 M10).
+VaultStorage createDefaultVaultStorage() => impl.createDefaultVaultStorage();

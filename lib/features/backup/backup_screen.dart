@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/platform/platform_caps.dart';
 import '../../core/vault/vault_errors.dart';
 import '../../core/vault/vault_merge.dart';
 import '../../data/vault_controller.dart';
@@ -132,6 +133,35 @@ class _BackupScreenState extends ConsumerState<BackupScreen> {
           child: ListView(
             padding: const EdgeInsets.all(16.0),
             children: <Widget>[
+              if (isWeb) ...<Widget>[
+                Container(
+                  margin: const EdgeInsets.only(bottom: 16),
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: theme.colorScheme.outlineVariant),
+                  ),
+                  child: Row(
+                    children: <Widget>[
+                      Icon(
+                        Icons.info_outline,
+                        size: 20,
+                        color: theme.colorScheme.primary,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          'Browser storage can be cleared by your browser or in private browsing mode. Export regular backups to keep your codes safe.',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
               // Export Encrypted Vault Card
               Card(
                 elevation: 1,

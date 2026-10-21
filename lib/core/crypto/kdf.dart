@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:isolate';
 import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:hashlib/hashlib.dart';
 
 /// Configuration parameters for Argon2id key derivation.
@@ -122,15 +123,20 @@ Uint8List deriveKeySync(
 
 /// Derives a cryptographic key asynchronously using Argon2id.
 ///
-/// Runs in a background isolate (§5.3) for production parameters to keep UI responsive.
+/// Runs in a background isolate (§5.3) on native platforms for production parameters to keep UI responsive.
+/// On Web, runs synchronously after a brief frame yield (§9 M10) since isolates are not supported in JS.
 /// When using [KdfParams.testFast], runs synchronously to support Flutter's fakeAsync test harness.
 Future<Uint8List> deriveKey(
   String password,
   Uint8List salt, {
   KdfParams params = KdfParams.production,
-}) {
+}) async {
+  if (kIsWeb) {
+    await Future<void>.delayed(Duration.zero);
+    return deriveKeySync(password, salt, params: params);
+  }
   if (params == KdfParams.testFast) {
-    return Future.value(deriveKeySync(password, salt, params: params));
+    return deriveKeySync(password, salt, params: params);
   }
   return Isolate.run(() => deriveKeySync(password, salt, params: params));
 }

@@ -66,6 +66,13 @@ jobs:
       - name: Build Android APK
         run: flutter build apk --release
 
+      - name: Verify no INTERNET permission in build artifacts
+        run: |
+          if grep -rn "android.permission.INTERNET" build/app/intermediates/merged_manifests/; then
+            echo "Error: Found forbidden android.permission.INTERNET in merged Android manifests"
+            exit 1
+          fi
+
       - name: Upload Android APK
         uses: actions/upload-artifact@v4
         with:
@@ -106,10 +113,97 @@ jobs:
           name: offline2fa-linux-x64
           path: offline2fa-linux-x64.tar.gz
 
+  build-web:
+    name: Build Web
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Build Web
+        run: flutter build web --release
+
+      - name: Create Web release archive
+        run: tar -czvf offline2fa-web.tar.gz -C build/web .
+
+      - name: Upload Web Archive
+        uses: actions/upload-artifact@v4
+        with:
+          name: offline2fa-web
+          path: offline2fa-web.tar.gz
+
+  build-windows:
+    name: Build Windows
+    needs: test
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Build Windows Desktop
+        run: flutter build windows --release
+
+      - name: Create Windows release archive
+        run: Compress-Archive -Path build\windows\x64\runner\Release\* -DestinationPath offline2fa-windows-x64.zip
+
+      - name: Upload Windows Archive
+        uses: actions/upload-artifact@v4
+        with:
+          name: offline2fa-windows-x64
+          path: offline2fa-windows-x64.zip
+
+  build-macos:
+    name: Build macOS
+    needs: test
+    runs-on: macos-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Build macOS Desktop
+        run: flutter build macos --release
+
+      - name: Create macOS release archive
+        run: tar -czvf offline2fa-macos.tar.gz -C build/macos/Build/Products/Release "Offline 2FA.app"
+
+      - name: Upload macOS Archive
+        uses: actions/upload-artifact@v4
+        with:
+          name: offline2fa-macos
+          path: offline2fa-macos.tar.gz
+
   release:
     name: Release
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: [build-android, build-linux]
+    needs: [build-android, build-linux, build-web, build-windows, build-macos]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -126,9 +220,30 @@ jobs:
           name: offline2fa-linux-x64
           path: release
 
+      - name: Download Web archive
+        uses: actions/download-artifact@v4
+        with:
+          name: offline2fa-web
+          path: release
+
+      - name: Download Windows archive
+        uses: actions/download-artifact@v4
+        with:
+          name: offline2fa-windows-x64
+          path: release
+
+      - name: Download macOS archive
+        uses: actions/download-artifact@v4
+        with:
+          name: offline2fa-macos
+          path: release
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           files: |
             release/app-release.apk
             release/offline2fa-linux-x64.tar.gz
+            release/offline2fa-web.tar.gz
+            release/offline2fa-windows-x64.zip
+            release/offline2fa-macos.tar.gz

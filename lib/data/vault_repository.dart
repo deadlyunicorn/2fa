@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/crypto/kdf.dart';
@@ -10,13 +11,14 @@ import '../core/vault/vault_format.dart';
 import '../core/vault/vault_merge.dart';
 import '../core/vault/vault_payload.dart';
 import 'vault_storage.dart';
-import 'vault_storage_io.dart';
 
 /// Repository managing vault persistence, encryption keys, and cryptographic operations (§4, §5.2, §5.6).
 class VaultRepository {
   VaultRepository({
     required this.storage,
-    this.defaultKdfParams = KdfParams.production,
+    this.defaultKdfParams = kIsWeb
+        ? KdfParams.owaspBaseline
+        : KdfParams.production,
   });
 
   final VaultStorage storage;
@@ -296,7 +298,7 @@ class VaultRepository {
 
 /// Provider for [VaultStorage].
 final vaultStorageProvider = Provider<VaultStorage>((ref) {
-  return VaultStorageIo();
+  return createDefaultVaultStorage();
 });
 
 /// Provider for [VaultRepository].

@@ -1,8 +1,8 @@
-import 'dart:io';
-
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import 'file_io_helper.dart';
 
 /// Function signature for picking a vault file and returning its raw bytes.
 typedef FilePickerFn = Future<Uint8List?> Function();
@@ -41,7 +41,7 @@ Future<Uint8List?> pickVaultFile() async {
       return await file.readAsBytes();
     } catch (_) {
       if (file.path != null) {
-        return await File(file.path!).readAsBytes();
+        return await readFileFromPath(file.path!);
       }
     }
   }
@@ -56,7 +56,7 @@ Future<Uint8List?> pickImageFile() async {
       return await file.readAsBytes();
     } catch (_) {
       if (file.path != null) {
-        return await File(file.path!).readAsBytes();
+        return await readFileFromPath(file.path!);
       }
     }
   }
@@ -77,21 +77,7 @@ Future<bool> saveVaultFile({
     return false;
   }
   if (!kIsWeb) {
-    try {
-      final String outputPath = outputUri.isScheme('file')
-          ? outputUri.toFilePath()
-          : outputUri.path;
-      if (outputPath.isNotEmpty) {
-        final isDesktop =
-            Platform.isLinux || Platform.isWindows || Platform.isMacOS;
-        final file = File(outputPath);
-        if (isDesktop || !file.existsSync() || file.lengthSync() == 0) {
-          await file.writeAsBytes(bytes, flush: true);
-        }
-      }
-    } catch (_) {
-      // In case path cannot be written directly on mobile where plugin already handled it.
-    }
+    await writeDesktopBytesIfEmpty(outputUri, bytes);
   }
   return true;
 }

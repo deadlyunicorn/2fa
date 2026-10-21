@@ -104,3 +104,6 @@ class VaultStorageIo implements VaultStorage {
     if (await tmp.exists()) await tmp.delete();
   }
 }
+
+/// Creates the default I/O implementation of [VaultStorage].
+VaultStorage createDefaultVaultStorage() => VaultStorageIo();
