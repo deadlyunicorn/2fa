@@ -6,7 +6,7 @@ void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
   testWidgets('app initialization smoke test', (WidgetTester tester) async {
-    app.main();
+    await app.main();
     await tester.pumpAndSettle();
     expect(find.text('Offline 2FA'), findsOneWidget);
   });

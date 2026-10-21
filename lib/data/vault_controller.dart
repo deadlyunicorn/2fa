@@ -313,6 +313,7 @@ class VaultController extends Notifier<VaultState> {
   /// Locks the vault and zeroes memory credentials (§5.2).
   Future<void> lock() async {
     _repository.lock();
+    state = const VaultLocked();
     final hasBackup = await _repository.hasBackup();
     state = VaultLocked(hasBackup: hasBackup);
   }

@@ -120,11 +120,17 @@ Uint8List deriveKeySync(
   return Uint8List.fromList(digest.bytes);
 }
 
-/// Derives a cryptographic key asynchronously in a background isolate using Argon2id.
+/// Derives a cryptographic key asynchronously using Argon2id.
+///
+/// Runs in a background isolate (§5.3) for production parameters to keep UI responsive.
+/// When using [KdfParams.testFast], runs synchronously to support Flutter's fakeAsync test harness.
 Future<Uint8List> deriveKey(
   String password,
   Uint8List salt, {
   KdfParams params = KdfParams.production,
 }) {
+  if (params == KdfParams.testFast) {
+    return Future.value(deriveKeySync(password, salt, params: params));
+  }
   return Isolate.run(() => deriveKeySync(password, salt, params: params));
 }

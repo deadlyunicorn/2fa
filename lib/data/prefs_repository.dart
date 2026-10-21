@@ -175,15 +175,27 @@ final prefsRepositoryProvider = Provider<PrefsRepository>((ref) {
 
 /// Riverpod notifier managing reactive [AppPrefs] state.
 class PrefsNotifier extends Notifier<AppPrefs> {
+  PrefsRepository? get _repository {
+    try {
+      return ref.read(prefsRepositoryProvider);
+    } catch (_) {
+      return null;
+    }
+  }
+
   @override
   AppPrefs build() {
-    final repository = ref.watch(prefsRepositoryProvider);
-    return repository.load();
+    try {
+      final repository = ref.watch(prefsRepositoryProvider);
+      return repository.load();
+    } catch (_) {
+      return const AppPrefs();
+    }
   }
 
   Future<void> setThemeMode(ThemeMode mode) async {
     state = state.copyWith(themeMode: mode);
-    await ref.read(prefsRepositoryProvider).setThemeMode(mode);
+    await _repository?.setThemeMode(mode);
   }
 
   Future<void> setAutoLockTimeout(AutoLockTimeout timeout) =>
@@ -191,12 +203,12 @@ class PrefsNotifier extends Notifier<AppPrefs> {
 
   Future<void> setAutoLockTimeoutSeconds(int seconds) async {
     state = state.copyWith(autoLockTimeoutSeconds: seconds);
-    await ref.read(prefsRepositoryProvider).setAutoLockTimeoutSeconds(seconds);
+    await _repository?.setAutoLockTimeoutSeconds(seconds);
   }
 
   Future<void> setLockOnBackground(bool value) async {
     state = state.copyWith(lockOnBackground: value);
-    await ref.read(prefsRepositoryProvider).setLockOnBackground(value);
+    await _repository?.setLockOnBackground(value);
   }
 
   Future<void> setClipboardClearDelay(ClipboardClearDelay delay) =>
@@ -204,12 +216,14 @@ class PrefsNotifier extends Notifier<AppPrefs> {
 
   Future<void> setClipboardClearSeconds(int seconds) async {
     state = state.copyWith(clipboardClearSeconds: seconds);
-    await ref.read(prefsRepositoryProvider).setClipboardClearSeconds(seconds);
+    await _repository?.setClipboardClearSeconds(seconds);
   }
 
   Future<void> update(AppPrefs newPrefs) async {
     state = newPrefs;
-    await ref.read(prefsRepositoryProvider).save(newPrefs);
+    if (_repository != null) {
+      await _repository!.save(newPrefs);
+    }
   }
 }
 

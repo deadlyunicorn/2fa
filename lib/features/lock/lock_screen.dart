@@ -1,11 +1,6 @@
-import 'package:flutter/material.dart';
+import 'unlock_screen.dart';
 
-/// Screen displayed when the vault exists but is currently locked.
-class LockScreen extends StatelessWidget {
-  const LockScreen({super.key});
+export 'unlock_screen.dart';
 
-  @override
-  Widget build(BuildContext context) {
-    return const Scaffold(body: Center(child: Text('Unlock Vault')));
-  }
-}
+/// Backward-compatible alias for [UnlockScreen].
+typedef LockScreen = UnlockScreen;
