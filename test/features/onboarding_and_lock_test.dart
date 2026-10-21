@@ -225,7 +225,7 @@ void main() {
         await tester.pumpAndSettle();
 
         // Redirects to home
-        expect(find.text('Offline 2FA Entries'), findsOneWidget);
+        expect(find.text('No accounts yet'), findsOneWidget);
       },
     );
 
@@ -295,7 +295,7 @@ void main() {
       await tester.pumpAndSettle();
 
       // On home screen
-      expect(find.text('Offline 2FA Entries'), findsOneWidget);
+      expect(find.text('No accounts yet'), findsOneWidget);
 
       // Simulate app going to background (paused / hidden) and returning
       tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
@@ -326,7 +326,7 @@ void main() {
       await tester.pumpAndSettle();
 
       // On home screen
-      expect(find.text('Offline 2FA Entries'), findsOneWidget);
+      expect(find.text('No accounts yet'), findsOneWidget);
 
       // Advance time by 31 seconds
       await tester.pump(const Duration(seconds: 31));
@@ -371,7 +371,7 @@ void main() {
       await tester.pumpAndSettle();
 
       // Unlocks and lands on home screen
-      expect(find.text('Offline 2FA Entries'), findsOneWidget);
+      expect(find.text('No accounts yet'), findsOneWidget);
     });
 
     testWidgets('8. Restore from backup flow during unlock', (
@@ -408,7 +408,7 @@ void main() {
       await tester.pumpAndSettle();
 
       // Successfully restored and unlocked
-      expect(find.text('Offline 2FA Entries'), findsOneWidget);
+      expect(find.text('No accounts yet'), findsOneWidget);
     });
 
     testWidgets('9. User pointer activity resets inactivity timer', (
@@ -429,17 +429,17 @@ void main() {
       await tester.tap(find.widgetWithText(FilledButton, 'Unlock'));
       await tester.pumpAndSettle();
 
-      expect(find.text('Offline 2FA Entries'), findsOneWidget);
+      expect(find.text('No accounts yet'), findsOneWidget);
 
       // Advance 20 seconds
       await tester.pump(const Duration(seconds: 20));
       // User interacts: tap center of screen to reset timer
-      await tester.tap(find.text('Offline 2FA Entries'));
+      await tester.tap(find.text('No accounts yet'));
       await tester.pump();
 
       // Advance another 20 seconds (total 40s from start, but only 20s from tap)
       await tester.pump(const Duration(seconds: 20));
-      expect(find.text('Offline 2FA Entries'), findsOneWidget);
+      expect(find.text('No accounts yet'), findsOneWidget);
 
       // Advance another 15 seconds (35s from tap) -> timer fires
       await tester.pump(const Duration(seconds: 15));
@@ -494,7 +494,7 @@ void main() {
         await tester.tap(unlockButton);
         await tester.pumpAndSettle();
 
-        expect(find.text('Offline 2FA Entries'), findsOneWidget);
+        expect(find.text('No accounts yet'), findsOneWidget);
       },
     );
   });
