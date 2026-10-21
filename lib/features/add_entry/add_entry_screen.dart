@@ -106,7 +106,7 @@ class AddHubScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(title: const Text('Add Account')),
       body: ResponsiveContentWrapper(
-        child: Padding(
+        child: SingleChildScrollView(
           padding: const EdgeInsets.all(20.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,

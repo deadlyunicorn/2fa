@@ -187,23 +187,28 @@ class EntryTile extends ConsumerWidget {
                       ),
                     ],
                     const SizedBox(height: 6.0),
-                    Row(
+                    Wrap(
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      spacing: 8.0,
                       children: <Widget>[
                         CodeText(code: currentCode, fontSize: 22.0),
-                        if (nextCode != null) ...<Widget>[
-                          const SizedBox(width: 8.0),
-                          Text(
-                            'Next: ',
-                            style: theme.textTheme.labelSmall?.copyWith(
-                              color: theme.colorScheme.onSurfaceVariant,
-                            ),
+                        if (nextCode != null)
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: <Widget>[
+                              Text(
+                                'Next: ',
+                                style: theme.textTheme.labelSmall?.copyWith(
+                                  color: theme.colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                              CodeText(
+                                code: nextCode,
+                                fontSize: 14.0,
+                                isFaint: true,
+                              ),
+                            ],
                           ),
-                          CodeText(
-                            code: nextCode,
-                            fontSize: 14.0,
-                            isFaint: true,
-                          ),
-                        ],
                       ],
                     ),
                   ],

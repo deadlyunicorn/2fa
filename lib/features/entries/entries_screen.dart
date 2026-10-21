@@ -201,7 +201,11 @@ class _EntriesListScreenState extends ConsumerState<EntriesListScreen> {
                   if (groups.isNotEmpty) ...<Widget>[
                     const SizedBox(height: 8),
                     SizedBox(
-                      height: 44,
+                      height:
+                          44.0 *
+                          MediaQuery.textScalerOf(context)
+                              .scale(1.0)
+                              .clamp(1.0, 2.0),
                       child: ListView(
                         scrollDirection: Axis.horizontal,
                         padding: const EdgeInsets.symmetric(horizontal: 12.0),

@@ -217,35 +217,38 @@ class EntryDetailsScreen extends ConsumerWidget {
                           color: theme.colorScheme.surfaceContainerHighest,
                           borderRadius: BorderRadius.circular(12.0),
                         ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: <Widget>[
-                            CodeText(code: currentCode, fontSize: 32.0),
-                            const SizedBox(width: 16.0),
-                            if (entry.type == OtpType.totp)
-                              CountdownRing(
-                                remainingSeconds: remSeconds,
-                                period: entry.period,
-                                size: 36.0,
-                              )
-                            else
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: <Widget>[
+                              CodeText(code: currentCode, fontSize: 32.0),
+                              const SizedBox(width: 16.0),
+                              if (entry.type == OtpType.totp)
+                                CountdownRing(
+                                  remainingSeconds: remSeconds,
+                                  period: entry.period,
+                                  size: 36.0,
+                                )
+                              else
+                                IconButton(
+                                  icon: const Icon(Icons.refresh),
+                                  tooltip: 'Next HOTP code',
+                                  onPressed: () {
+                                    ref
+                                        .read(vaultControllerProvider.notifier)
+                                        .incrementHotp(entry.id);
+                                  },
+                                ),
+                              const SizedBox(width: 8.0),
                               IconButton(
-                                icon: const Icon(Icons.refresh),
-                                tooltip: 'Next HOTP code',
-                                onPressed: () {
-                                  ref
-                                      .read(vaultControllerProvider.notifier)
-                                      .incrementHotp(entry.id);
-                                },
+                                icon: const Icon(Icons.copy),
+                                tooltip: 'Copy code',
+                                onPressed: () =>
+                                    _copyCode(context, ref, currentCode),
                               ),
-                            const SizedBox(width: 8.0),
-                            IconButton(
-                              icon: const Icon(Icons.copy),
-                              tooltip: 'Copy code',
-                              onPressed: () =>
-                                  _copyCode(context, ref, currentCode),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
                       ),
                     ],
