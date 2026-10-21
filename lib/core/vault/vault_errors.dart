@@ -57,13 +57,3 @@ class InvalidPayload extends VaultException {
 class VaultFileNotFound extends VaultException {
   const VaultFileNotFound([super.message = 'Vault file not found']);
 }
-
-// Backward-compatible aliases
-typedef NotAVaultFileException = NotAVaultFile;
-typedef UnsupportedVersionException = UnsupportedVersion;
-typedef UnsupportedKdfException = UnsupportedKdf;
-typedef UnsupportedCipherException = UnsupportedCipher;
-typedef InvalidHeaderException = InvalidHeader;
-typedef WrongPasswordOrCorruptedFileException = WrongPasswordOrCorrupted;
-typedef InvalidPayloadException = InvalidPayload;
-typedef VaultFileNotFoundException = VaultFileNotFound;

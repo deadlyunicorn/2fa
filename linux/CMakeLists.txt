@@ -97,6 +97,20 @@ install(TARGETS ${BINARY_NAME} RUNTIME DESTINATION "${CMAKE_INSTALL_PREFIX}"
 install(FILES "${FLUTTER_ICU_DATA_FILE}" DESTINATION "${INSTALL_BUNDLE_DATA_DIR}"
   COMPONENT Runtime)
 
+install(FILES "${PROJECT_SOURCE_DIR}/../assets/icon/app_icon.png"
+  DESTINATION "${INSTALL_BUNDLE_DATA_DIR}"
+  RENAME "app_icon.png"
+  COMPONENT Runtime)
+
+install(FILES "com.deadlyunicorn.offline2fa.desktop"
+  DESTINATION "${CMAKE_INSTALL_PREFIX}/share/applications"
+  COMPONENT Runtime)
+
+install(FILES "${PROJECT_SOURCE_DIR}/../assets/icon/app_icon.png"
+  DESTINATION "${CMAKE_INSTALL_PREFIX}/share/icons/hicolor/1024x1024/apps"
+  RENAME "com.deadlyunicorn.offline2fa.png"
+  COMPONENT Runtime)
+
 install(FILES "${FLUTTER_LIBRARY}" DESTINATION "${INSTALL_BUNDLE_LIB_DIR}"
   COMPONENT Runtime)
 

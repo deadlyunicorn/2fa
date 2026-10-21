@@ -115,11 +115,13 @@ A `.2favault` file consists of a 47-byte big-endian binary header, followed by t
 ### Prerequisites
 
 - [Flutter SDK](https://docs.flutter.dev/get-started/install) (stable channel, 3.13.5+ / Dart 3.13.5+)
-- **Linux Desktop Build Dependencies:**
-  ```bash
-  sudo apt install clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev
-  ```
-- **Android Dependencies:** Android SDK with platform-tools and build-tools (minSdk 23+).
+- **Linux Desktop Build & Runtime Dependencies:**
+  - Build packages:
+    ```bash
+    sudo apt install clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev
+    ```
+  - Runtime desktop integration: `xdg-desktop-portal` (recommended, standard on modern desktop environments) or `zenity` for native file open/save dialogs (§8).
+- **Android Dependencies:** Android SDK with platform-tools and build-tools (minSdk 24+).
 
 ### Development & Verification
 
@@ -155,7 +157,34 @@ flutter build apk --release
 
 # Android App Bundle release (for Google Play / distribution)
 flutter build appbundle --release
+
+# Web release build (offline bundle without external Google CDN fonts or CanvasKit)
+flutter build web --release --no-web-resources-cdn
 ```
+
+### Web Platform & Browser Storage Caveat
+
+When running on the web, the vault is stored in encrypted form in browser local storage (`localStorage`).
+
+> [!WARNING]
+> Web browser storage can be cleared when clearing browsing data or browsing in Private/Incognito modes. Always export a `.2favault` backup file regularly to preserve your accounts across browser cleanups.
+
+### Optional Android Release Signing Setup
+
+By default, release builds sign with the debug key for ease of testing and side-loading. To configure official release signing:
+
+1. Create a Java keystore:
+   ```bash
+   keytool -genkey -v -keystore android/upload-keystore.jks -keyalg RSA -keysize 2048 -validity 10000 -alias upload
+   ```
+2. Create `android/key.properties`:
+   ```properties
+   storePassword=<password>
+   keyPassword=<password>
+   keyAlias=upload
+   storeFile=upload-keystore.jks
+   ```
+3. For CI (GitHub Actions), encode the keystore (`base64 android/upload-keystore.jks`) and set repository secrets `ANDROID_KEYSTORE_BASE64`, `KEYSTORE_PASSWORD`, `KEY_ALIAS`, and `KEY_PASSWORD`.
 
 ### Verifying No-INTERNET Permission
 

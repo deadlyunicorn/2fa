@@ -145,28 +145,5 @@ void main() {
       await tester.pump(const Duration(seconds: 25));
       expect(currentClipboard, 'code1');
     });
-
-    testWidgets('copyWithAutoClear delegates with duration correctly', (
-      tester,
-    ) async {
-      String? currentClipboard;
-      final service = ClipboardService(
-        clipboardWriter: (data) async {
-          currentClipboard = data.text;
-        },
-        clipboardReader: (_) async => currentClipboard != null
-            ? ClipboardData(text: currentClipboard!)
-            : null,
-      );
-
-      await service.copyWithAutoClear(
-        'durationCode',
-        clearDelay: const Duration(seconds: 5),
-      );
-      expect(currentClipboard, 'durationCode');
-
-      await tester.pump(const Duration(seconds: 5));
-      expect(currentClipboard, '');
-    });
   });
 }

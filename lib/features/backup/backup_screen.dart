@@ -85,7 +85,9 @@ class _BackupScreenState extends ConsumerState<BackupScreen> {
 
     setState(() {
       _isBusy = true;
-      _busyMessage = 'Decrypting and merging vault...';
+      _busyMessage = isWeb
+          ? 'Deriving encryption key in browser (may take a few seconds)...'
+          : 'Decrypting and merging vault...';
     });
 
     try {

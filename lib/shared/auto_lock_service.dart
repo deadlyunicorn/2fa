@@ -6,30 +6,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../data/prefs_repository.dart';
 import '../data/vault_controller.dart';
 
-/// Pure service managing inactivity timeouts (§5.7).
-class AutoLockService {
-  AutoLockService({
-    required this.onLock,
-    this.inactivityTimeout = const Duration(minutes: 1),
-  });
-
-  final VoidCallback onLock;
-  Duration inactivityTimeout;
-  Timer? _inactivityTimer;
-
-  void resetInactivityTimer() {
-    _inactivityTimer?.cancel();
-    if (inactivityTimeout > Duration.zero) {
-      _inactivityTimer = Timer(inactivityTimeout, onLock);
-    }
-  }
-
-  void stop() {
-    _inactivityTimer?.cancel();
-    _inactivityTimer = null;
-  }
-}
-
 /// Manages temporary suppression of auto-lock during external system picker interactions (§5.7).
 class AutoLockSuppressNotifier extends Notifier<int> {
   DateTime? _graceUntil;

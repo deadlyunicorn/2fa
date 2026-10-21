@@ -132,7 +132,7 @@ Future<Uint8List> deriveKey(
   KdfParams params = KdfParams.production,
 }) async {
   if (kIsWeb) {
-    await Future<void>.delayed(Duration.zero);
+    await Future<void>.delayed(const Duration(milliseconds: 50));
     return deriveKeySync(password, salt, params: params);
   }
   if (params == KdfParams.testFast) {

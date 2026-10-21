@@ -43,6 +43,7 @@ class _Offline2faAppState extends ConsumerState<Offline2faApp> {
           brightness: Brightness.light,
         ),
         useMaterial3: true,
+        fontFamilyFallback: const ['sans-serif', 'Roboto', 'system-ui'],
       ),
       darkTheme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
@@ -50,6 +51,7 @@ class _Offline2faAppState extends ConsumerState<Offline2faApp> {
           brightness: Brightness.dark,
         ),
         useMaterial3: true,
+        fontFamilyFallback: const ['sans-serif', 'Roboto', 'system-ui'],
       ),
       routerConfig: router,
       builder: (BuildContext context, Widget? child) {

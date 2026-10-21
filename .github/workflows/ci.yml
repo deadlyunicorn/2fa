@@ -2,10 +2,10 @@ name: CI
 
 on:
   push:
-    branches: [ main ]
+    branches: [ '**' ]
     tags: [ 'v*' ]
   pull_request:
-    branches: [ main ]
+    branches: [ '**' ]
 
 jobs:
   test:
@@ -21,6 +21,11 @@ jobs:
           channel: 'stable'
           cache: true
 
+      - name: Install Linux build & test dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev xvfb
+
       - name: Install dependencies
         run: flutter pub get
 
@@ -32,6 +37,36 @@ jobs:
 
       - name: Run unit & widget tests
         run: flutter test --coverage
+
+      - name: Verify lib/core test coverage >= 90%
+        run: |
+          python3 -c "
+          import sys
+          in_core = False
+          found, hit = 0, 0
+          with open('coverage/lcov.info', 'r') as f:
+              for line in f:
+                  line = line.strip()
+                  if line.startswith('SF:'):
+                      in_core = line[3:].startswith('lib/core/')
+                  elif in_core and line.startswith('LF:'):
+                      found += int(line[3:])
+                  elif in_core and line.startswith('LH:'):
+                      hit += int(line[3:])
+                  elif line == 'end_of_record':
+                      in_core = False
+          if found == 0:
+              print('Error: No lib/core coverage records found')
+              sys.exit(1)
+          pct = (hit / found) * 100.0
+          print(f'lib/core coverage: {hit}/{found} ({pct:.2f}%)')
+          if pct < 90.0:
+              print(f'Error: lib/core coverage ({pct:.2f}%) is below 90% threshold')
+              sys.exit(1)
+          "
+
+      - name: Run Linux integration test headlessly
+        run: xvfb-run -a flutter test integration_test/app_flow_test.dart -d linux
 
       - name: Check for forbidden print statements in lib/
         run: |
@@ -66,12 +101,13 @@ jobs:
       - name: Build Android APK
         run: flutter build apk --release
 
-      - name: Verify no INTERNET permission in build artifacts
+      - name: Verify no INTERNET permission in release APK
         run: |
-          if grep -rn "android.permission.INTERNET" build/app/intermediates/merged_manifests/; then
-            echo "Error: Found forbidden android.permission.INTERNET in merged Android manifests"
+          if $ANDROID_HOME/build-tools/*/aapt2 dump permissions build/app/outputs/flutter-apk/app-release.apk | grep -q "android.permission.INTERNET"; then
+            echo "Error: Found forbidden android.permission.INTERNET in release APK"
             exit 1
           fi
+          echo "Verified: No android.permission.INTERNET found in release APK"
 
       - name: Upload Android APK
         uses: actions/upload-artifact@v4
@@ -131,7 +167,7 @@ jobs:
         run: flutter pub get
 
       - name: Build Web
-        run: flutter build web --release
+        run: flutter build web --release --no-web-resources-cdn
 
       - name: Create Web release archive
         run: tar -czvf offline2fa-web.tar.gz -C build/web .

@@ -45,12 +45,6 @@ class ClipboardService {
     }
   }
 
-  /// Backward-compatible helper using [Duration].
-  Future<void> copyWithAutoClear(String text, {Duration? clearDelay}) async {
-    final seconds = clearDelay?.inSeconds ?? 30;
-    await copyCode(text, clearAfterSeconds: seconds);
-  }
-
   /// Cancels any active auto-clear timer.
   void dispose() {
     _clearTimer?.cancel();

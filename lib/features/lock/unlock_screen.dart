@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/platform/platform_caps.dart';
 import '../../data/vault_controller.dart';
 import '../../shared/widgets/busy_overlay.dart';
 import '../../shared/widgets/confirm_dialog.dart';
@@ -162,7 +163,9 @@ class _UnlockScreenState extends ConsumerState<UnlockScreen> {
       ),
       body: BusyOverlay(
         isBusy: isBusy,
-        message: 'Unlocking vault...',
+        message: isWeb
+            ? 'Deriving encryption key in browser (may take a few seconds)...'
+            : 'Unlocking vault...',
         child: SafeArea(
           child: ResponsiveContentWrapper(
             child: Center(

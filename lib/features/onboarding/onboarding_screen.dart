@@ -165,7 +165,9 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     return Scaffold(
       body: BusyOverlay(
         isBusy: isBusy,
-        message: 'Deriving key and setting up vault...',
+        message: isWeb
+            ? 'Deriving encryption key in browser (may take a few seconds)...'
+            : 'Deriving key and setting up vault...',
         child: SafeArea(
           child: ResponsiveContentWrapper(
             child: Center(
