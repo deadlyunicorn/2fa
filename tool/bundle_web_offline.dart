@@ -40,7 +40,31 @@ Future<void> main(List<String> args) async {
     exit(1);
   }
 
-  // 1. Sanitize build/web/index.html to remove any residual <base> tag
+  // 1. Compile KDF Web Worker
+  stdout.writeln(
+    'Compiling KDF Web Worker (web/kdf_worker.dart -> build/web/kdf_worker.js)...',
+  );
+  final workerProcess = await Process.run('dart', [
+    'compile',
+    'js',
+    '-O4',
+    '--packages=.dart_tool/package_config.json',
+    '-o',
+    '${webBuildDir.path}/kdf_worker.js',
+    '${projectDir.path}/web/kdf_worker.dart',
+  ]);
+  if (workerProcess.exitCode != 0) {
+    stderr.writeln('Worker compilation failed:');
+    stderr.writeln(workerProcess.stderr);
+    exit(1);
+  }
+  final workerBuildFile = File('${webBuildDir.path}/kdf_worker.js');
+  workerBuildFile.copySync('${projectDir.path}/web/kdf_worker.js');
+  stdout.writeln(
+    'KDF Web Worker compiled successfully (${workerBuildFile.lengthSync()} bytes).',
+  );
+
+  // 2. Sanitize build/web/index.html to remove any residual <base> tag
   final indexHtmlFile = File('${webBuildDir.path}/index.html');
   if (indexHtmlFile.existsSync()) {
     var indexHtml = indexHtmlFile.readAsStringSync();
@@ -92,16 +116,25 @@ Future<void> main(List<String> args) async {
     }
   }
 
+  // Include kdf_worker.js in VFS as well
+  if (workerBuildFile.existsSync()) {
+    addFileToVfs(workerBuildFile);
+  }
+
   stdout.writeln('Collected ${vfsMap.length} files into Offline VFS.');
 
   // 3. Generate build/web/offline_vfs.js
   stdout.writeln('Generating build/web/offline_vfs.js...');
   final vfsJsFile = File('${webBuildDir.path}/offline_vfs.js');
   final vfsJson = jsonEncode(vfsMap);
+  final kdfWorkerCode = workerBuildFile.existsSync()
+      ? workerBuildFile.readAsStringSync()
+      : '';
 
   final vfsCode = StringBuffer();
   vfsCode.writeln('// Offline VFS & file:// Protocol Shim for Offline 2FA');
   vfsCode.writeln('window.OFFLINE_VFS = $vfsJson;');
+  vfsCode.writeln('window.KDF_WORKER_CODE = ${jsonEncode(kdfWorkerCode)};');
   vfsCode.writeln(r'''
 (function() {
   var isFile = (window.location.protocol === 'file:');

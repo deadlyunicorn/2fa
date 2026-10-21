@@ -17,7 +17,7 @@ class VaultRepository {
   VaultRepository({
     required this.storage,
     this.defaultKdfParams = kIsWeb
-        ? KdfParams.owaspBaseline
+        ? KdfParams.webDefault
         : KdfParams.production,
   });
 

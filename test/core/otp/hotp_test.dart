@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -84,6 +85,40 @@ void main() {
       test('large counter works (64-bit int)', () {
         final code = hotp(secretBytes, 0x7FFFFFFFFFFFFFFF, digits: 6);
         expect(code.length, equals(6));
+      });
+
+      test('counter exceeding 32 bits (20000000000) encodes correctly without throwing', () {
+        // 20000000000 = 0x4A817C800
+        final code = hotp(secretBytes, 20000000000, digits: 6);
+        expect(code.length, equals(6));
+        expect(int.tryParse(code), isNotNull);
+      });
+
+      test('no ByteData 64-bit accessors used in lib/ (dart2js compatibility check)', () {
+        final libDir = Directory('lib');
+        final forbiddenRegex = RegExp(
+          r'\.(setUint64|getUint64|setInt64|getInt64)\s*\(',
+        );
+        for (final entity in libDir.listSync(recursive: true)) {
+          if (entity is File && entity.path.endsWith('.dart')) {
+            final lines = entity.readAsLinesSync();
+            for (var i = 0; i < lines.length; i++) {
+              final line = lines[i].trim();
+              if (line.startsWith('//') ||
+                  line.startsWith('/*') ||
+                  line.startsWith('*')) {
+                continue;
+              }
+              final matches = forbiddenRegex.allMatches(line);
+              expect(
+                matches.isEmpty,
+                isTrue,
+                reason:
+                    'Found forbidden 64-bit accessor on line ${i + 1} of ${entity.path} (incompatible with dart2js)',
+              );
+            }
+          }
+        }
       });
     });
 

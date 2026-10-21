@@ -5,6 +5,12 @@ import 'dart:typed_data';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:hashlib/hashlib.dart';
 
+import 'kdf_stub.dart' if (dart.library.js_interop) 'kdf_web.dart';
+
+export 'kdf_stub.dart'
+    if (dart.library.js_interop) 'kdf_web.dart'
+    show deriveKeyWeb;
+
 /// Configuration parameters for Argon2id key derivation.
 class KdfParams {
   const KdfParams({
@@ -28,6 +34,17 @@ class KdfParams {
   static const KdfParams owaspBaseline = KdfParams(
     memoryKiB: 19456,
     iterations: 2,
+    parallelism: 1,
+    saltLength: 16,
+    keyLength: 32,
+  );
+
+  /// Web default parameters for new vaults created in a browser (§9 M10):
+  /// m = 4096 KiB (4 MiB), t = 1, p = 1.
+  /// Derives in ~0.65s in JS while maintaining Argon2id memory hardness.
+  static const KdfParams webDefault = KdfParams(
+    memoryKiB: 4096,
+    iterations: 1,
     parallelism: 1,
     saltLength: 16,
     keyLength: 32,
@@ -124,7 +141,7 @@ Uint8List deriveKeySync(
 /// Derives a cryptographic key asynchronously using Argon2id.
 ///
 /// Runs in a background isolate (§5.3) on native platforms for production parameters to keep UI responsive.
-/// On Web, runs synchronously after a brief frame yield (§9 M10) since isolates are not supported in JS.
+/// On Web, offloads to a background Web Worker (§9 M10) via [deriveKeyWeb] so the browser UI never freezes.
 /// When using [KdfParams.testFast], runs synchronously to support Flutter's fakeAsync test harness.
 Future<Uint8List> deriveKey(
   String password,
@@ -132,8 +149,7 @@ Future<Uint8List> deriveKey(
   KdfParams params = KdfParams.production,
 }) async {
   if (kIsWeb) {
-    await Future<void>.delayed(const Duration(milliseconds: 50));
-    return deriveKeySync(password, salt, params: params);
+    return deriveKeyWeb(password, salt, params);
   }
   if (params == KdfParams.testFast) {
     return deriveKeySync(password, salt, params: params);

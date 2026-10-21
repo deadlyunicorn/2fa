@@ -44,10 +44,14 @@ String hotp(
     );
   }
 
-  // 8-byte big-endian counter
+  // 8-byte big-endian counter (using setUint32 for dart2js Web compatibility,
+  // as ByteData.setUint64 throws UnsupportedError on dart2js)
   final counterBytes = Uint8List(8);
   final byteData = ByteData.sublistView(counterBytes);
-  byteData.setUint64(0, counter, Endian.big);
+  final high = counter ~/ 0x100000000;
+  final low = counter & 0xffffffff;
+  byteData.setUint32(0, high, Endian.big);
+  byteData.setUint32(4, low, Endian.big);
 
   // HMAC calculation using package:crypto
   final Hash hash;

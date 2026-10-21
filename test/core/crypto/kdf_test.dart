@@ -25,6 +25,14 @@ void main() {
       expect(KdfParams.owaspBaseline.keyLength, equals(32));
     });
 
+    test('webDefault parameters match specification', () {
+      expect(KdfParams.webDefault.memoryKiB, equals(4096));
+      expect(KdfParams.webDefault.iterations, equals(1));
+      expect(KdfParams.webDefault.parallelism, equals(1));
+      expect(KdfParams.webDefault.saltLength, equals(16));
+      expect(KdfParams.webDefault.keyLength, equals(32));
+    });
+
     test('testFast parameters match specification', () {
       expect(KdfParams.testFast.memoryKiB, equals(1024));
       expect(KdfParams.testFast.iterations, equals(1));
@@ -155,5 +163,16 @@ void main() {
         expect(constantTimeEquals(syncKey, asyncKey), isTrue);
       },
     );
+
+    test('deriveKeyWeb produces identical derived key', () async {
+      final salt = Uint8List.fromList(List.generate(16, (i) => i));
+      final syncKey = deriveKeySync(
+        'web-test',
+        salt,
+        params: KdfParams.testFast,
+      );
+      final webKey = await deriveKeyWeb('web-test', salt, KdfParams.testFast);
+      expect(constantTimeEquals(syncKey, webKey), isTrue);
+    });
   });
 }
