@@ -56,14 +56,20 @@ class _EntriesListScreenState extends ConsumerState<EntriesListScreen> {
     final searchQuery = ref.watch(searchQueryProvider);
     final selectedGroupId = ref.watch(selectedGroupIdProvider);
 
-    final canReorder = searchQuery.isEmpty && selectedGroupId == null;
-
     final totalEntriesCount = vaultState is VaultUnlocked
         ? vaultState.data.entries.length
         : 0;
     final groups = vaultState is VaultUnlocked
-        ? vaultState.data.groups
+        ? (List<Group>.from(vaultState.data.groups)
+            ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder)))
         : const <Group>[];
+
+    final effectiveSelectedGroupId =
+        (selectedGroupId != null && groups.any((g) => g.id == selectedGroupId))
+        ? selectedGroupId
+        : null;
+
+    final canReorder = searchQuery.isEmpty && effectiveSelectedGroupId == null;
 
     return Scaffold(
       appBar: AppBar(
@@ -204,7 +210,7 @@ class _EntriesListScreenState extends ConsumerState<EntriesListScreen> {
                             padding: const EdgeInsets.only(right: 8.0),
                             child: ChoiceChip(
                               label: const Text('All'),
-                              selected: selectedGroupId == null,
+                              selected: effectiveSelectedGroupId == null,
                               onSelected: (_) {
                                 ref
                                     .read(selectedGroupIdProvider.notifier)
@@ -217,7 +223,7 @@ class _EntriesListScreenState extends ConsumerState<EntriesListScreen> {
                               padding: const EdgeInsets.only(right: 8.0),
                               child: ChoiceChip(
                                 label: Text(group.name),
-                                selected: selectedGroupId == group.id,
+                                selected: effectiveSelectedGroupId == group.id,
                                 onSelected: (selected) {
                                   ref
                                       .read(selectedGroupIdProvider.notifier)
@@ -225,6 +231,18 @@ class _EntriesListScreenState extends ConsumerState<EntriesListScreen> {
                                 },
                               ),
                             ),
+                          Padding(
+                            padding: const EdgeInsets.only(right: 8.0),
+                            child: ActionChip(
+                              avatar: const Icon(
+                                Icons.settings_outlined,
+                                size: 16,
+                              ),
+                              label: const Text('Manage'),
+                              tooltip: 'Manage groups',
+                              onPressed: () => context.push('/groups'),
+                            ),
+                          ),
                         ],
                       ),
                     ),

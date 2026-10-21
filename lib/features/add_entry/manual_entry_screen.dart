@@ -19,6 +19,7 @@ import '../../shared/widgets/countdown_ring.dart';
 import '../../shared/widgets/letter_avatar.dart';
 import '../../shared/widgets/obscured_text_field.dart';
 import '../../shared/widgets/responsive_wrapper.dart';
+import '../groups/groups_screen.dart';
 
 /// Screen for creating or editing an OTP account entry (§7.1 #5).
 class ManualEntryScreen extends ConsumerStatefulWidget {
@@ -210,6 +211,15 @@ class _ManualEntryScreenState extends ConsumerState<ManualEntryScreen> {
     }
   }
 
+  Future<void> _handleCreateGroup() async {
+    final newGroup = await showAddGroupDialog(context, ref);
+    if (newGroup != null && mounted) {
+      setState(() {
+        _selectedGroupIds.add(newGroup.id);
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -219,7 +229,8 @@ class _ManualEntryScreenState extends ConsumerState<ManualEntryScreen> {
 
     final vaultState = ref.watch(vaultControllerProvider);
     final groups = vaultState is VaultUnlocked
-        ? vaultState.data.groups
+        ? (List<Group>.from(vaultState.data.groups)
+            ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder)))
         : const <Group>[];
 
     // Live code preview calculations
@@ -376,6 +387,58 @@ class _ManualEntryScreenState extends ConsumerState<ManualEntryScreen> {
                   },
                 ),
                 const SizedBox(height: 16.0),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: <Widget>[
+                    Text(
+                      'Groups',
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    TextButton.icon(
+                      icon: const Icon(Icons.add, size: 18),
+                      label: const Text('New group'),
+                      onPressed: _handleCreateGroup,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8.0),
+                if (groups.isEmpty)
+                  Text(
+                    'No groups created yet. Tap "New group" to organize accounts.',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  )
+                else
+                  Wrap(
+                    spacing: 8.0,
+                    runSpacing: 4.0,
+                    children: <Widget>[
+                      for (final group in groups)
+                        FilterChip(
+                          label: Text(group.name),
+                          selected: _selectedGroupIds.contains(group.id),
+                          onSelected: (selected) {
+                            setState(() {
+                              if (selected) {
+                                _selectedGroupIds.add(group.id);
+                              } else {
+                                _selectedGroupIds.remove(group.id);
+                              }
+                            });
+                          },
+                        ),
+                      ActionChip(
+                        avatar: const Icon(Icons.add, size: 16),
+                        label: const Text('New group'),
+                        tooltip: 'Create new group',
+                        onPressed: _handleCreateGroup,
+                      ),
+                    ],
+                  ),
+                const SizedBox(height: 16.0),
                 ExpansionTile(
                   leading: const Icon(Icons.tune),
                   title: const Text('Advanced options'),
@@ -485,42 +548,6 @@ class _ManualEntryScreenState extends ConsumerState<ManualEntryScreen> {
                                 }
                                 return null;
                               },
-                            ),
-                          const SizedBox(height: 16.0),
-                          const Text(
-                            'Groups',
-                            style: TextStyle(fontWeight: FontWeight.w600),
-                          ),
-                          const SizedBox(height: 8.0),
-                          if (groups.isEmpty)
-                            Text(
-                              'No groups created yet',
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                color: theme.colorScheme.onSurfaceVariant,
-                              ),
-                            )
-                          else
-                            Wrap(
-                              spacing: 8.0,
-                              runSpacing: 4.0,
-                              children: <Widget>[
-                                for (final group in groups)
-                                  FilterChip(
-                                    label: Text(group.name),
-                                    selected: _selectedGroupIds.contains(
-                                      group.id,
-                                    ),
-                                    onSelected: (selected) {
-                                      setState(() {
-                                        if (selected) {
-                                          _selectedGroupIds.add(group.id);
-                                        } else {
-                                          _selectedGroupIds.remove(group.id);
-                                        }
-                                      });
-                                    },
-                                  ),
-                              ],
                             ),
                           const SizedBox(height: 16.0),
                           TextFormField(

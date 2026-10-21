@@ -503,6 +503,9 @@ class VaultController extends Notifier<VaultState> {
 
   /// Deletes a group and strips its ID from all entries without deleting entries (§4.1, §7.1 #10).
   Future<void> deleteGroup(String id) {
+    if (ref.read(selectedGroupIdProvider) == id) {
+      ref.read(selectedGroupIdProvider.notifier).selectGroup(null);
+    }
     return _mutate((current) async {
       final updatedGroups = current.groups.where((g) => g.id != id).toList();
       final updatedEntries = [
@@ -652,11 +655,19 @@ final filteredEntriesProvider = Provider<List<OtpEntry>>((ref) {
   final selectedGroupId = ref.watch(selectedGroupIdProvider);
   final rawQuery = ref.watch(searchQueryProvider).trim().toLowerCase();
 
+  // If a selected group is deleted or missing, gracefully fall back to All (null).
+  final effectiveGroupId =
+      (selectedGroupId != null &&
+          vaultState.data.groups.any((g) => g.id == selectedGroupId))
+      ? selectedGroupId
+      : null;
+
   final entries = List<OtpEntry>.from(vaultState.data.entries)
     ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
 
   return entries.where((entry) {
-    if (selectedGroupId != null && !entry.groupIds.contains(selectedGroupId)) {
+    if (effectiveGroupId != null &&
+        !entry.groupIds.contains(effectiveGroupId)) {
       return false;
     }
 
