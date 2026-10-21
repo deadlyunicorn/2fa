@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 
+import '../core/vault/vault_errors.dart';
 import 'vault_storage.dart';
 
 /// Web (IndexedDB / LocalStorage) implementation of [VaultStorage] (Phase 3).
@@ -11,10 +12,14 @@ class VaultStorageWeb implements VaultStorage {
   Future<bool> backupExists() async => false;
 
   @override
-  Future<Uint8List?> read() async => null;
+  Future<Uint8List> read() async {
+    throw const VaultFileNotFound('VaultStorageWeb is not implemented yet');
+  }
 
   @override
-  Future<Uint8List?> readBackup() async => null;
+  Future<Uint8List> readBackup() async {
+    throw const VaultFileNotFound('VaultStorageWeb is not implemented yet');
+  }
 
   @override
   Future<void> writeAtomic(Uint8List bytes) async {

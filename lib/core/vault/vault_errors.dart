@@ -45,6 +45,11 @@ class InvalidPayload extends VaultException {
   const InvalidPayload([super.message = 'Invalid vault payload']);
 }
 
+/// Thrown when a required vault file or backup file is not found on disk.
+class VaultFileNotFound extends VaultException {
+  const VaultFileNotFound([super.message = 'Vault file not found']);
+}
+
 // Backward-compatible aliases
 typedef NotAVaultFileException = NotAVaultFile;
 typedef UnsupportedVersionException = UnsupportedVersion;
@@ -53,3 +58,4 @@ typedef UnsupportedCipherException = UnsupportedCipher;
 typedef InvalidHeaderException = InvalidHeader;
 typedef WrongPasswordOrCorruptedFileException = WrongPasswordOrCorrupted;
 typedef InvalidPayloadException = InvalidPayload;
+typedef VaultFileNotFoundException = VaultFileNotFound;
