@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import 'core/models/otp_entry.dart';
+import 'core/otp/otpauth_uri.dart';
+import 'core/platform/platform_caps.dart';
 import 'data/vault_controller.dart';
 import 'features/add_entry/add_entry_screen.dart';
 import 'features/backup/backup_screen.dart';
@@ -109,13 +112,38 @@ GoRouter createRouter(Ref ref) {
         routes: <RouteBase>[
           GoRoute(
             path: 'manual',
-            builder: (BuildContext context, GoRouterState state) =>
-                const ManualEntryScreen(),
+            builder: (BuildContext context, GoRouterState state) {
+              OtpEntry? initialEntry;
+              if (state.extra is OtpEntry) {
+                initialEntry = state.extra as OtpEntry;
+              } else if (state.extra is String) {
+                try {
+                  initialEntry = OtpAuthUri.parse(state.extra as String);
+                } catch (_) {}
+              } else if (state.uri.queryParameters.containsKey('uri')) {
+                try {
+                  initialEntry = OtpAuthUri.parse(
+                    state.uri.queryParameters['uri']!,
+                  );
+                } catch (_) {}
+              }
+              return ManualEntryScreen(initialEntry: initialEntry);
+            },
           ),
           GoRoute(
             path: 'scan',
-            builder: (BuildContext context, GoRouterState state) =>
-                const ScanQrScreen(),
+            redirect: (BuildContext context, GoRouterState state) {
+              if (!supportsCamera) {
+                return '/add/manual';
+              }
+              return null;
+            },
+            builder: (BuildContext context, GoRouterState state) {
+              final builder = state.extra is ScannerBuilder
+                  ? state.extra as ScannerBuilder
+                  : null;
+              return ScanQrScreen(scannerBuilder: builder);
+            },
           ),
         ],
       ),

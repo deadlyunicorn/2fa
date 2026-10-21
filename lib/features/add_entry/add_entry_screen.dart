@@ -1,18 +1,105 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/otp/otpauth_uri.dart';
 import '../../core/platform/platform_caps.dart';
+import '../../shared/file_picker_service.dart';
 import '../../shared/widgets/responsive_wrapper.dart';
 import 'manual_entry_screen.dart';
+import 'qr_image_decoder.dart';
 
 export 'manual_entry_screen.dart';
+export 'qr_image_decoder.dart';
+export 'scan_qr_screen.dart';
+
+/// Helper to pick an image, decode a QR code, and navigate to manual entry screen (§7.1 #7).
+Future<void> handleImageQrImport(
+  BuildContext context,
+  WidgetRef ref, {
+  bool replace = false,
+}) async {
+  final pickImage = ref.read(imagePickerProvider);
+  final bytes = await pickImage();
+  if (bytes == null || !context.mounted) {
+    return;
+  }
+
+  final decodeQr = ref.read(qrImageDecoderProvider);
+  final qrText = await decodeQr(bytes);
+  if (!context.mounted) {
+    return;
+  }
+
+  if (qrText == null) {
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('No QR code found in image'),
+        duration: Duration(seconds: 3),
+      ),
+    );
+    return;
+  }
+
+  final trimmed = qrText.trim();
+  if (trimmed.toLowerCase().startsWith('otpauth-migration:')) {
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Not supported yet'),
+        duration: Duration(seconds: 3),
+      ),
+    );
+    return;
+  }
+
+  try {
+    final entry = OtpAuthUri.parse(trimmed);
+    if (!context.mounted) return;
+    if (replace) {
+      context.pushReplacement('/add/manual', extra: entry);
+    } else {
+      unawaited(context.push('/add/manual', extra: entry));
+    }
+  } on MigrationNotSupportedException {
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Not supported yet'),
+        duration: Duration(seconds: 3),
+      ),
+    );
+  } on OtpAuthUriException catch (e) {
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Invalid 2FA QR code: ${e.message}'),
+        duration: const Duration(seconds: 3),
+      ),
+    );
+  } catch (e) {
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Invalid 2FA QR code: $e'),
+        duration: const Duration(seconds: 3),
+      ),
+    );
+  }
+}
 
 /// Screen offering account addition via camera, image QR, or manual entry (§7.1 #4).
-class AddHubScreen extends StatelessWidget {
+class AddHubScreen extends ConsumerWidget {
   const AddHubScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final canScan = supportsCamera;
 
@@ -52,14 +139,7 @@ class AddHubScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 12.0),
                 OutlinedButton.icon(
-                  onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Image QR import is coming in M6'),
-                        duration: Duration(seconds: 2),
-                      ),
-                    );
-                  },
+                  onPressed: () => handleImageQrImport(context, ref),
                   icon: const Icon(Icons.image_outlined),
                   label: const Text('Import QR from Image'),
                   style: OutlinedButton.styleFrom(
@@ -77,14 +157,7 @@ class AddHubScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 12.0),
                 OutlinedButton.icon(
-                  onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Image QR loading is coming in M6'),
-                        duration: Duration(seconds: 2),
-                      ),
-                    );
-                  },
+                  onPressed: () => handleImageQrImport(context, ref),
                   icon: const Icon(Icons.image_outlined),
                   label: const Text('Load QR from Image File'),
                   style: OutlinedButton.styleFrom(
@@ -95,21 +168,6 @@ class AddHubScreen extends StatelessWidget {
             ],
           ),
         ),
-      ),
-    );
-  }
-}
-
-/// Placeholder screen for camera QR scanning (§7.1 #6, M6).
-class ScanQrScreen extends StatelessWidget {
-  const ScanQrScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Scan QR Code')),
-      body: const Center(
-        child: Text('Camera QR scanner will be implemented in M6'),
       ),
     );
   }
