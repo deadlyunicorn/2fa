@@ -358,10 +358,10 @@ On web, `dart:io` `Platform` must not be touched. Use conditional imports or che
 Work **in order**. Each milestone ends with: `flutter analyze` clean, `flutter test` green, a commit (Conventional Commits, e.g. `feat(vault): …`), and ticking the boxes here. If you stop mid-milestone, leave a note under §13 Progress Log.
 
 ### M0 — Scaffold (§3)
-- [ ] Flutter project at the repo root with android, ios, linux
-- [ ] App name, IDs, permissions, LICENSE, README skeleton, analysis_options
-- [ ] Folder structure from §4 with placeholder files
-- [ ] CI workflow (§11)
+- [x] Flutter project at the repo root with android, ios, linux
+- [x] App name, IDs, permissions, LICENSE, README skeleton, analysis_options
+- [x] Folder structure from §4 with placeholder files
+- [x] CI workflow (§11)
 
 ### M1 — OTP core (pure Dart)
 - [ ] `base32.dart` + tests
@@ -452,6 +452,7 @@ Work **in order**. Each milestone ends with: `flutter analyze` clean, `flutter t
 _Agents: append dated entries — what was done, what's next, any blockers._
 
 - 2026-10-21 — Plan created. Nothing implemented yet. Flutter SDK was **not** found on the dev machine PATH; install it first (M0).
+- 2026-10-21 — Milestone M0 completed. Flutter 3.47.7 project scaffold created with package `offline2fa` (`com.deadlyunicorn.offline2fa`) supporting Android, iOS, and Linux. Dependencies added (Riverpod, GoRouter, cryptography, hashlib, zxing2, qr_flutter, etc.). Configured permissions, display names, minSdk 23, and window titles. Added GPL-3.0 LICENSE, comprehensive README.md, strict analysis_options.yaml, folder structure with typed placeholder files, and GitHub Actions CI workflow. Configured QEMU_SET_ENV for ARM64 host Android SDK emulation. Verified `dart format`, `flutter analyze` (0 issues), `flutter test` (passed), `flutter build linux` (built), and `flutter build apk --debug` (built). Next: M1 — OTP core.
 
 ## 14. Decision Log
 | Date | Decision | Reason |
@@ -465,4 +466,6 @@ _Agents: append dated entries — what was done, what's next, any blockers._
 | 2026-10-21 | Phase 1: Android, iOS, Linux. Then Web/Windows/macOS | product owner choice |
 | 2026-10-21 | Riverpod without codegen, go_router, hand-written models | fewer moving parts for agents |
 | 2026-10-21 | No third-party importers in v1 | product owner choice |
+| 2026-10-21 | Flutter project at repository root with package name `offline2fa` | Product owner clarification |
+| 2026-10-21 | Set `QEMU_SET_ENV` for Android SDK toolchain under ARM64 emulation | Fixes glibc libdl/libz library resolution for x86_64 SDK binaries on aarch64 host |
 | _TBD (M2)_ | Final KDF params after benchmark | |
