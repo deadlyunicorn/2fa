@@ -11,6 +11,7 @@ class ObscuredTextField extends StatefulWidget {
     this.helperText,
     this.autofocus = false,
     this.enabled = true,
+    this.readOnly = false,
     this.obscureByDefault = true,
     this.focusNode,
     this.onChanged,
@@ -18,6 +19,7 @@ class ObscuredTextField extends StatefulWidget {
     this.validator,
     this.textInputAction,
     this.prefixIcon,
+    this.suffixActions,
   });
 
   final TextEditingController? controller;
@@ -27,6 +29,7 @@ class ObscuredTextField extends StatefulWidget {
   final String? helperText;
   final bool autofocus;
   final bool enabled;
+  final bool readOnly;
   final bool obscureByDefault;
   final FocusNode? focusNode;
   final ValueChanged<String>? onChanged;
@@ -34,6 +37,7 @@ class ObscuredTextField extends StatefulWidget {
   final FormFieldValidator<String>? validator;
   final TextInputAction? textInputAction;
   final Widget? prefixIcon;
+  final List<Widget>? suffixActions;
 
   @override
   State<ObscuredTextField> createState() => _ObscuredTextFieldState();
@@ -56,6 +60,27 @@ class _ObscuredTextFieldState extends State<ObscuredTextField> {
 
   @override
   Widget build(BuildContext context) {
+    final Widget suffixWidget;
+    if (widget.suffixActions != null && widget.suffixActions!.isNotEmpty) {
+      suffixWidget = Row(
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          IconButton(
+            icon: Icon(_obscureText ? Icons.visibility : Icons.visibility_off),
+            tooltip: _obscureText ? 'Show password' : 'Hide password',
+            onPressed: widget.enabled ? _toggleObscure : null,
+          ),
+          ...widget.suffixActions!,
+        ],
+      );
+    } else {
+      suffixWidget = IconButton(
+        icon: Icon(_obscureText ? Icons.visibility : Icons.visibility_off),
+        tooltip: _obscureText ? 'Show password' : 'Hide password',
+        onPressed: widget.enabled ? _toggleObscure : null,
+      );
+    }
+
     return TextFormField(
       controller: widget.controller,
       focusNode: widget.focusNode,
@@ -64,6 +89,7 @@ class _ObscuredTextFieldState extends State<ObscuredTextField> {
       autocorrect: false,
       autofocus: widget.autofocus,
       enabled: widget.enabled,
+      readOnly: widget.readOnly,
       onChanged: widget.onChanged,
       onFieldSubmitted: widget.onSubmitted,
       validator: widget.validator,
@@ -75,11 +101,7 @@ class _ObscuredTextFieldState extends State<ObscuredTextField> {
         helperText: widget.helperText,
         prefixIcon: widget.prefixIcon,
         border: const OutlineInputBorder(),
-        suffixIcon: IconButton(
-          icon: Icon(_obscureText ? Icons.visibility : Icons.visibility_off),
-          tooltip: _obscureText ? 'Show password' : 'Hide password',
-          onPressed: widget.enabled ? _toggleObscure : null,
-        ),
+        suffixIcon: suffixWidget,
       ),
     );
   }
