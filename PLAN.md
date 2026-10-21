@@ -364,10 +364,10 @@ Work **in order**. Each milestone ends with: `flutter analyze` clean, `flutter t
 - [x] CI workflow (§11)
 
 ### M1 — OTP core (pure Dart)
-- [ ] `base32.dart` + tests
-- [ ] `hotp.dart`, `totp.dart` + RFC vector tests
-- [ ] `otpauth_uri.dart` + tests
-- [ ] Models `OtpEntry`, `Group`, enums, with JSON round-trip tests
+- [x] `base32.dart` + tests
+- [x] `hotp.dart`, `totp.dart` + RFC vector tests
+- [x] `otpauth_uri.dart` + tests
+- [x] Models `OtpEntry`, `Group`, enums, with JSON round-trip tests
 
 ### M2 — Crypto & vault format
 - [ ] `kdf.dart` (Argon2id via hashlib in an isolate) + test with a known Argon2id vector (RFC 9106 test vector, or cross-checked against a reference implementation)
@@ -453,6 +453,7 @@ _Agents: append dated entries — what was done, what's next, any blockers._
 
 - 2026-10-21 — Plan created. Nothing implemented yet. Flutter SDK was **not** found on the dev machine PATH; install it first (M0).
 - 2026-10-21 — Milestone M0 completed. Flutter 3.47.7 project scaffold created with package `offline2fa` (`com.deadlyunicorn.offline2fa`) supporting Android, iOS, and Linux. Dependencies added (Riverpod, GoRouter, cryptography, hashlib, zxing2, qr_flutter, etc.). Configured permissions, display names, minSdk 23, and window titles. Added GPL-3.0 LICENSE, comprehensive README.md, strict analysis_options.yaml, folder structure with typed placeholder files, and GitHub Actions CI workflow. Configured QEMU_SET_ENV for ARM64 host Android SDK emulation. Verified `dart format`, `flutter analyze` (0 issues), `flutter test` (passed), `flutter build linux` (built), and `flutter build apk --debug` (built). Next: M1 — OTP core.
+- 2026-10-21 — Milestone M1 completed. Implemented RFC 4648 Base32 encoder/lenient-decoder with normalize/isValid helpers; RFC 4226 HOTP and RFC 6238 TOTP with remainingSeconds helper; OtpAuthUri parser and serializer with Google Key Uri Format compliance and MigrationNotSupportedException handling; immutable models OtpEntry, Group, OtpType, and OtpAlgorithm matching §5.5 schema with JSON round-trip serialization, validation, and unmodifiable fields. Verified all RFC 4226 Appendix D vectors, all 18 RFC 6238 Appendix B vectors, and Base32 RFC test vectors. All 169 unit/widget tests passing with 95.3% test coverage across core. dart format and flutter analyze clean with 0 issues. Next: M2 — Crypto & vault format.
 
 ## 14. Decision Log
 | Date | Decision | Reason |
