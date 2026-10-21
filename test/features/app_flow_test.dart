@@ -202,7 +202,9 @@ void main() {
         expect(find.text('GitHub'), findsOneWidget);
         expect(find.text('user@example.com'), findsOneWidget);
 
-        final codeTextFinder = find.byType(CodeText);
+        final codeTextFinder = find.byWidgetPredicate(
+          (w) => w is CodeText && !w.isFaint,
+        );
         expect(codeTextFinder, findsOneWidget);
         final initialCodeWidget = tester.widget<CodeText>(codeTextFinder);
         final generatedCode = initialCodeWidget.code;
@@ -349,7 +351,7 @@ void main() {
         expect(find.text('user@example.com'), findsOneWidget);
 
         final restoredCodeWidget = tester.widget<CodeText>(
-          find.byType(CodeText),
+          find.byWidgetPredicate((w) => w is CodeText && !w.isFaint),
         );
         expect(restoredCodeWidget.code, equals(generatedCode));
       },
