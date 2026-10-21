@@ -1,44 +1,55 @@
-/// Typed exceptions for vault operations and format decoding.
+/// Typed exceptions for vault operations, format decoding, and cryptography.
 sealed class VaultException implements Exception {
   const VaultException(this.message);
+
   final String message;
 
   @override
   String toString() => '$runtimeType: $message';
 }
 
-class NotAVaultFileException extends VaultException {
-  const NotAVaultFileException([super.message = 'Not a valid vault file']);
+/// Thrown when a file does not have the .2favault magic header or is too short (< 63 bytes).
+class NotAVaultFile extends VaultException {
+  const NotAVaultFile([super.message = 'Not a valid vault file']);
 }
 
-class UnsupportedVersionException extends VaultException {
-  const UnsupportedVersionException([
-    super.message = 'Unsupported vault version',
-  ]);
+/// Thrown when the vault format version is unsupported (version != 1).
+class UnsupportedVersion extends VaultException {
+  const UnsupportedVersion([super.message = 'Unsupported vault version']);
 }
 
-class UnsupportedKdfException extends VaultException {
-  const UnsupportedKdfException([super.message = 'Unsupported KDF algorithm']);
+/// Thrown when the KDF algorithm identifier is unsupported (kdfId != 1).
+class UnsupportedKdf extends VaultException {
+  const UnsupportedKdf([super.message = 'Unsupported KDF algorithm']);
 }
 
-class UnsupportedCipherException extends VaultException {
-  const UnsupportedCipherException([
-    super.message = 'Unsupported cipher algorithm',
-  ]);
+/// Thrown when the cipher algorithm identifier is unsupported (cipherId != 1).
+class UnsupportedCipher extends VaultException {
+  const UnsupportedCipher([super.message = 'Unsupported cipher algorithm']);
 }
 
-class InvalidHeaderException extends VaultException {
-  const InvalidHeaderException([
-    super.message = 'Invalid vault header parameters',
-  ]);
+/// Thrown when vault header parameters exceed safe DoS bounds or violate schema lengths.
+class InvalidHeader extends VaultException {
+  const InvalidHeader([super.message = 'Invalid vault header parameters']);
 }
 
-class WrongPasswordOrCorruptedFileException extends VaultException {
-  const WrongPasswordOrCorruptedFileException([
+/// Thrown when AES-256-GCM authentication fails (wrong password or corrupted ciphertext/tag/header).
+class WrongPasswordOrCorrupted extends VaultException {
+  const WrongPasswordOrCorrupted([
     super.message = 'Wrong password or corrupted file',
   ]);
 }
 
-class InvalidPayloadException extends VaultException {
-  const InvalidPayloadException([super.message = 'Invalid vault payload']);
+/// Thrown when decrypted payload is invalid UTF-8, invalid JSON, or has an unsupported schemaVersion.
+class InvalidPayload extends VaultException {
+  const InvalidPayload([super.message = 'Invalid vault payload']);
 }
+
+// Backward-compatible aliases
+typedef NotAVaultFileException = NotAVaultFile;
+typedef UnsupportedVersionException = UnsupportedVersion;
+typedef UnsupportedKdfException = UnsupportedKdf;
+typedef UnsupportedCipherException = UnsupportedCipher;
+typedef InvalidHeaderException = InvalidHeader;
+typedef WrongPasswordOrCorruptedFileException = WrongPasswordOrCorrupted;
+typedef InvalidPayloadException = InvalidPayload;

@@ -370,12 +370,12 @@ Work **in order**. Each milestone ends with: `flutter analyze` clean, `flutter t
 - [x] Models `OtpEntry`, `Group`, enums, with JSON round-trip tests
 
 ### M2 — Crypto & vault format
-- [ ] `kdf.dart` (Argon2id via hashlib in an isolate) + test with a known Argon2id vector (RFC 9106 test vector, or cross-checked against a reference implementation)
-- [ ] `aead.dart` (AES-256-GCM via `cryptography`)
-- [ ] `vault_format.dart` + `vault_codec.dart`: tests for round trip, wrong password, flipped byte in header / ciphertext / tag → `WrongPasswordOrCorrupted`, bad magic, bad version, out-of-bounds params, truncated file
-- [ ] Commit a golden test fixture `test/fixtures/v1_sample.2favault` (password `correct horse battery staple`) to guarantee backward compatibility forever
-- [ ] `vault_merge.dart` + tests (§6.4)
-- [ ] KDF benchmark and record it in §14
+- [x] `kdf.dart` (Argon2id via hashlib in an isolate) + test with a known Argon2id vector (RFC 9106 test vector, or cross-checked against a reference implementation)
+- [x] `aead.dart` (AES-256-GCM via `cryptography`)
+- [x] `vault_format.dart` + `vault_codec.dart`: tests for round trip, wrong password, flipped byte in header / ciphertext / tag → `WrongPasswordOrCorrupted`, bad magic, bad version, out-of-bounds params, truncated file
+- [x] Commit a golden test fixture `test/fixtures/v1_sample.2favault` (password `correct horse battery staple`) to guarantee backward compatibility forever
+- [x] `vault_merge.dart` + tests (§6.4)
+- [x] KDF benchmark and record it in §14
 
 ### M3 — Storage & state
 - [ ] `VaultStorage` IO impl (atomic write, .bak), tested with a temp dir
@@ -454,6 +454,7 @@ _Agents: append dated entries — what was done, what's next, any blockers._
 - 2026-10-21 — Plan created. Nothing implemented yet. Flutter SDK was **not** found on the dev machine PATH; install it first (M0).
 - 2026-10-21 — Milestone M0 completed. Flutter 3.47.7 project scaffold created with package `offline2fa` (`com.deadlyunicorn.offline2fa`) supporting Android, iOS, and Linux. Dependencies added (Riverpod, GoRouter, cryptography, hashlib, zxing2, qr_flutter, etc.). Configured permissions, display names, minSdk 23, and window titles. Added GPL-3.0 LICENSE, comprehensive README.md, strict analysis_options.yaml, folder structure with typed placeholder files, and GitHub Actions CI workflow. Configured QEMU_SET_ENV for ARM64 host Android SDK emulation. Verified `dart format`, `flutter analyze` (0 issues), `flutter test` (passed), `flutter build linux` (built), and `flutter build apk --debug` (built). Next: M1 — OTP core.
 - 2026-10-21 — Milestone M1 completed. Implemented RFC 4648 Base32 encoder/lenient-decoder with normalize/isValid helpers; RFC 4226 HOTP and RFC 6238 TOTP with remainingSeconds helper; OtpAuthUri parser and serializer with Google Key Uri Format compliance and MigrationNotSupportedException handling; immutable models OtpEntry, Group, OtpType, and OtpAlgorithm matching §5.5 schema with JSON round-trip serialization, validation, and unmodifiable fields. Verified all RFC 4226 Appendix D vectors, all 18 RFC 6238 Appendix B vectors, and Base32 RFC test vectors. All 169 unit/widget tests passing with 95.3% test coverage across core. dart format and flutter analyze clean with 0 issues. Next: M2 — Crypto & vault format.
+- 2026-10-21 — Milestone M2 completed. Implemented `secure_bytes.dart` (zeroBytes, constantTimeEquals, randomBytes); `kdf.dart` with Argon2id via hashlib in background isolate (`deriveKey`, `deriveKeySync`, `KdfParams` with production, owaspBaseline, and testFast presets) verified against reference test vector; `aead.dart` with AES-256-GCM via cryptography and 16-byte authentication tags; typed `VaultException` hierarchy in `vault_errors.dart`; `.2favault` v1 47-byte big-endian binary header format and DoS guards in `vault_format.dart`; `vault_payload.dart` JSON serialization with unknown field handling and invalid entry skipping; `vault_codec.dart` with AEAD header authentication (AAD [0, 47)), full tamper and boundary tests; committed golden fixture `test/fixtures/v1_sample.2favault` with regression test; pure `vault_merge.dart` implementing §6.4 import-merge algorithm with group matching/remapping, deduplication, HOTP counter max updates, and collision-resistant UUID assignment. Measured KDF benchmark (avg ~262 ms for 64 MiB production, ~51 ms for 19 MiB OWASP baseline, ~1.8 ms for testFast) and recorded confirmation in §14 Decision Log. All 242 tests passing with 94.8% core test coverage. dart format and flutter analyze clean with 0 issues. Next: M3 — Storage & state.
 
 ## 14. Decision Log
 | Date | Decision | Reason |
@@ -469,4 +470,4 @@ _Agents: append dated entries — what was done, what's next, any blockers._
 | 2026-10-21 | No third-party importers in v1 | product owner choice |
 | 2026-10-21 | Flutter project at repository root with package name `offline2fa` | Product owner clarification |
 | 2026-10-21 | Set `QEMU_SET_ENV` for Android SDK toolchain under ARM64 emulation | Fixes glibc libdl/libz library resolution for x86_64 SDK binaries on aarch64 host |
-| _TBD (M2)_ | Final KDF params after benchmark | |
+| 2026-10-21 | Production KDF: Argon2id, m = 65536 KiB (64 MiB), t = 3, p = 1. Benchmark: avg 262.3 ms on host (OWASP baseline: 50.7 ms, testFast: 1.8 ms) | Measured 262.3 ms is well below the 2.5s unlock threshold (§5.3), maximizing brute-force resistance |
